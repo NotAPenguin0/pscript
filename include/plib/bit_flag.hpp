@@ -13,8 +13,11 @@ namespace plib {
 
         bit_flag() = default;
         bit_flag(underlying_type value) : _value(value) {}
+        bit_flag(enum_type value) : _value(static_cast<underlying_type>(value)) {}
         bit_flag(bit_flag const&) = default;
         bit_flag& operator=(bit_flag const&) = default;
+        bit_flag& operator=(underlying_type value) { _value = value; return *this; }
+        bit_flag& operator=(enum_type value) { _value = static_cast<underlying_type>(value); return *this; }
 
         underlying_type value() const {
             return _value;
