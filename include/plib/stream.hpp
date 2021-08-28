@@ -3,6 +3,7 @@
 #include <plib/types.hpp>
 #include <cstring>
 #include <cstdlib>
+#include <stdexcept>
 
 #include <algorithm> // TODO: May want to replace this with a lightweight header for common math functions like min(), with added constexpr support for some
 
@@ -71,6 +72,7 @@ namespace plib {
 		public:
 			file_stream_fetcher(char const* path, const char* mode) {
 				file = fopen(path, mode);
+				if (!file) throw std::runtime_error(std::string("Failed to open file ") + path);
 				// Find file size
 				fseek(file, 0, SEEK_END);
 				fsize = ftell(file);
