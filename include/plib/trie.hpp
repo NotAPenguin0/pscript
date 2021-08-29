@@ -157,7 +157,13 @@ public:
 			character_type c = prefix[0];
 			auto const& root = root_node[char_index(c)];
 			auto const& node = tst_get(root, prefix, 0);
-			tst_collect(node->middle, prefix, prefix + node->middle->key, result);
+			if (node->middle) {
+				tst_collect(node->middle, prefix, prefix + node->middle->key, result);
+			}
+			// This node could also be a value, add it.
+			if (node->value) {
+				result.push_back(prefix);
+			}
 		}
 
 		return result;

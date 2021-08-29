@@ -23,6 +23,9 @@ int main() {
 	print(mytrie.collect_all_keys());
 	std::cout << std::endl;
 	print(mytrie.collect_with_prefix("ab"));
+	std::cout << std::endl;
+	print(mytrie.collect_with_prefix("abc"));
+	std::cout << std::endl;
 
 	std::cout << *mytrie.get("abc") << std::endl;
 	std::cout << *mytrie.get("acc") << std::endl;
