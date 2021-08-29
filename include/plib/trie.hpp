@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <vector>
 
 
@@ -13,14 +14,25 @@ namespace plib {
  * @brief Implementation for a string trie. Useful for autocompletion or storing similar strings. 
  *		  The used representation is a hybrid ternary search trie, where the root node is a list of R ternary search tries.
  * @tparam S String type to be stored. The value_type of the string must be convertible to an index.
+ * @tparam V Value type accociated with each stored string.
 */
-template<typename S> requires std::convertible_to<typename S::value_type, std::size_t>
+template<typename S, typename V> requires std::convertible_to<typename S::value_type, std::size_t>
 class trie {
 public:
 	/**
 	 * @brief Character type of nodes in the trie.
 	*/
 	using character_type = typename S::value_type;
+
+	/**
+	 * @brief Key type of the S -> V mapping
+	*/
+	using key_type = S;
+
+	/**
+	 * @brief Value tyoe of the S -> V mapping
+	*/
+	using value_type = V;
 
 	/**
 	 * @brief Represents an alphabet of the trie. Any values outside of this range are forbidden and cannot be stored in the trie.
@@ -48,7 +60,7 @@ public:
 		root_node.resize(alphabet_size);
 		for (std::uint32_t i = 0; i < alphabet_size; ++i) {
 			root_node[i] = std::make_unique<ternary_node>();
-			root_node[i]->value = static_cast<character_type>(static_cast<std::uint32_t>(alpha.min) + i);
+			root_node[i]->key = static_cast<character_type>(static_cast<std::uint32_t>(alpha.min) + i);
 		}
 	}
 
@@ -72,7 +84,7 @@ public:
 	 * @brief Insert a new value into the trie.
 	 * @param str The string to insert. An empty string will be ignored.
 	*/
-	void insert(S const& str) {
+	void insert(S const& str, V&& value) {
 		if (str.size() == 0) return;
 
 		// Get the first character so we can index into our TST.
@@ -81,11 +93,32 @@ public:
 		// Note that we always insert in middle from the root node, since the character matches.
 		// We also make sure to only call this insert when the length of the string is > 1.
 		if (str.size() > 1) {
-			root->middle = tst_insert(root->middle, str, 1);
+			root->middle = tst_insert(root->middle, str, std::move(value), 1);
 		}
 		else {
 			// This key only has a single character, mark the key as an entry.
-			root->is_entry = true;
+			root->value = std::move(value);
+		}
+	}
+
+
+	/**
+	 * @brief Get the value associated with a given string.
+	 * @param str The string key to search for.
+	 * @return An optional containing the value, or std::nullopt if the key was not found.
+	*/
+	std::optional<value_type> get(S const& str) const {
+		if (str.size() == 0) return false;
+
+		character_type first = str[0];
+		auto const& root = root_node[char_index(first)];
+		if (str.size() > 1) {
+			auto const& node = tst_get(root->middle, str, 1);
+			if (node) return node->value;
+			else return std::nullopt;
+		}
+		else {
+			return root->value;
 		}
 	}
 
@@ -95,17 +128,9 @@ public:
 	 * @return True if the trie contains it, false if not.
 	*/
 	bool contains(S const& str) const {
-		if (str.size() == 0) return false;
-
-		character_type first = str[0];
-		auto const& root = root_node[char_index(first)];
-		if (str.size() > 1) {
-			return tst_find(root->middle, str, 1);
-		}
-		else {
-			return root->is_entry;
-		}
+		return get(str) != std::nullopt;
 	}
+
 
 	std::vector<S> collect_with_prefix(S const& prefix) const {
 		std::vector<S> result;
@@ -132,7 +157,7 @@ public:
 			character_type c = prefix[0];
 			auto const& root = root_node[char_index(c)];
 			auto const& node = tst_get(root, prefix, 0);
-			tst_collect(node->middle, prefix, prefix + node->middle->value, result);
+			tst_collect(node->middle, prefix, prefix + node->middle->key, result);
 		}
 
 		return result;
@@ -152,25 +177,25 @@ private:
 	*/
 	struct ternary_node {
 		/**
-		 * @brief Value of this node.
+		 * @brief Character key of this node.
 		*/
-		character_type value{};
+		character_type key{};
 
 		/**
-		 * @brief Whether this node is the end of a key.
+		 * @brief Value of this node, or std::nullopt if it has no value
 		*/
-		bool is_entry = false;
+		std::optional<value_type> value = std::nullopt;
 
 		/**
-		 * @brief TST with value < this.value
+		 * @brief TST with key < this.key
 		*/
 		std::unique_ptr<ternary_node> left;
 		/**
-		 * @brief TST with value == this.value
+		 * @brief TST with key == this.key
 		*/
 		std::unique_ptr<ternary_node> middle;
 		/**
-		 * @brief TST with value > this.value
+		 * @brief TST with key > this.key
 		*/
 		std::unique_ptr<ternary_node> right;
 	};
@@ -184,54 +209,44 @@ private:
 		return static_cast<std::uint32_t>(c) - static_cast<std::uint32_t>(alpha.min);
 	}
 
-	std::unique_ptr<ternary_node> tst_insert(std::unique_ptr<ternary_node>& node, S const& str, std::size_t index) {
+	std::unique_ptr<ternary_node> tst_insert(std::unique_ptr<ternary_node>& node, S const& str, value_type&& value, std::size_t index) {
 		character_type c = str[index];
 
 		// Node wasn't created yet.
 		if (node == nullptr) {
 			node = std::make_unique<ternary_node>();
-			node->value = c;
+			node->key = c;
 		}
 
 		// Insert in the correct sub-trie
-		if (c < node->value) node->left = tst_insert(node->left, str, index);
-		else if (c > node->value) node->right = tst_insert(node->right, str, index);
-		else if (index < str.size() - 1) node->middle = tst_insert(node->middle, str, index + 1);
-		else node->is_entry = true;
+		if (c < node->key) node->left = tst_insert(node->left, str, std::forward<value_type>(value), index);
+		else if (c > node->key) node->right = tst_insert(node->right, str, std::forward<value_type>(value), index);
+		else if (index < str.size() - 1) node->middle = tst_insert(node->middle, str, std::forward<value_type>(value), index + 1);
+		else node->value = std::move(value);
 
 		return std::move(node);
 	}
 
-	bool tst_find(std::unique_ptr<ternary_node> const& node, S const& str, std::size_t index) const {
-		if (node == nullptr) return false;
+	std::unique_ptr<ternary_node> const& tst_get(std::unique_ptr<ternary_node> const& node, S const& str, std::size_t index) const {
+		if (node == nullptr) return nullptr;
 
 		character_type c = str[index];
-		if (c < node->value) return tst_find(node->left, str, index);
-		else if (c > node->value) return tst_find(node->right, str, index);
-		else if (index < str.size() - 1) return tst_find(node->middle, str, index + 1);
-		else return node->is_entry;
+		if (c < node->key) return tst_get(node->left, str, index);
+		else if (c > node->key) return tst_get(node->right, str, index);
+		else if (index < str.size() - 1) return tst_get(node->middle, str, index + 1);
+		else return node;
 	}
 
 	void tst_collect(std::unique_ptr<ternary_node> const& node, S const& prev_prefix, S const& prefix, std::vector<S>& result) const {
 		if (node == nullptr) return;
 
-		if (node->is_entry) {
+		if (node->value) {
 			result.push_back(prefix);
 		}
 
-		if (node->left) tst_collect(node->left, prefix, prev_prefix + node->left->value, result);
-		if (node->middle) tst_collect(node->middle, prefix, prefix + node->middle->value, result);
-		if (node->right) tst_collect(node->right, prefix, prev_prefix + node->right->value, result);
-	}
-
-	std::unique_ptr<ternary_node> const& tst_get(std::unique_ptr<ternary_node> const& node, S const& str, int index) const {
-		if (node == nullptr) return nullptr;
-
-		character_type c = str[index];
-		if (c < node->value) return tst_get(node->left, str, index);
-		else if (c > node->value) return tst_get(node->right, str, index);
-		else if (index < str.size() - 1) return tst_get(node->middle, str, index + 1);
-		else return node;
+		if (node->left) tst_collect(node->left, prefix, prev_prefix + node->left->key, result);
+		if (node->middle) tst_collect(node->middle, prefix, prefix + node->middle->key, result);
+		if (node->right) tst_collect(node->right, prefix, prev_prefix + node->right->key, result);
 	}
 };
 
