@@ -108,7 +108,7 @@ public:
 	 * @return An optional containing the value, or std::nullopt if the key was not found.
 	*/
 	std::optional<value_type> get(S const& str) const {
-		if (str.size() == 0) return false;
+		if (str.size() == 0) return std::nullopt;
 
 		character_type first = str[0];
 		auto const& root = root_node[char_index(first)];
