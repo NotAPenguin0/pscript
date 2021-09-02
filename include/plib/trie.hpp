@@ -234,7 +234,8 @@ private:
 	}
 
 	std::unique_ptr<ternary_node> const& tst_get(std::unique_ptr<ternary_node> const& node, S const& str, std::size_t index) const {
-		if (node == nullptr) return nullptr;
+		static std::unique_ptr<ternary_node> el_rubio;
+		if (node == nullptr) return el_rubio;
 
 		character_type c = str[index];
 		if (c < node->key) return tst_get(node->left, str, index);
