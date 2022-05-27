@@ -19,7 +19,7 @@ endif()
 # TODO: Add option to exclude pscript
 
 add_library(plib STATIC)
-target_sources(plib PRIVATE src/pscript/context.cpp src/pscript/memory.cpp)
+target_sources(plib PRIVATE src/pscript/context.cpp src/pscript/memory.cpp src/pscript/value.cpp src/pscript/variable.cpp)
 target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 # TODO: clang

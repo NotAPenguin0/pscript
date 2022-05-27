@@ -12,7 +12,7 @@ bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer e
     return true;
 }
 
-TEST_CASE("Create pscript context", "[context]") {
+TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
     constexpr std::size_t memsize = 1024 * 1024;
     ps::context ctx(memsize);
@@ -57,5 +57,14 @@ TEST_CASE("Create pscript context", "[context]") {
         memory.free(p2);
     }
 
+    SECTION("variables") {
+        ps::memory_pool& memory = ctx.memory();
 
+        ps::variable& x = ctx.create_variable("x", 5);
+        REQUIRE(x.value().int_value(memory) == 5);
+
+        // Variable shadowing
+        ps::variable& x_float = ctx.create_variable("x", 3.14f);
+        REQUIRE(x.value().fp_value(memory) == 3.14f);
+    }
 }
