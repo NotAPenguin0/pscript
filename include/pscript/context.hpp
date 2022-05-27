@@ -2,6 +2,7 @@
 
 #include <pscript/memory.hpp>
 #include <pscript/variable.hpp>
+#include <pscript/script.hpp>
 
 #include <string>
 #include <unordered_map>
@@ -54,6 +55,12 @@ public:
             return it.first->second;
         }
     }
+
+    /**
+     * @brief Executes a script in this context.
+     * @param script Script object to execute.
+     */
+    void execute(ps::script const& script);
 
 private:
     ps::memory_pool mem;

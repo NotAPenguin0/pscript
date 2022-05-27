@@ -14,4 +14,8 @@ ps::memory_pool const& context::memory() const noexcept {
     return mem;
 }
 
+void context::execute(ps::script const& script) {
+
+}
+
 } // namespace ps

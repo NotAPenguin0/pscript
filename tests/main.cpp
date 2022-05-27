@@ -1,7 +1,20 @@
-#include <catch2/catch_test_macros.hpp>
-
 #include <pscript/context.hpp>
 #include <algorithm>
+#include <iostream>
+
+std::ostream& operator<<(std::ostream& out, ps::token const& tok) {
+    return out << tok.str;
+}
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <catch2/matchers/catch_matchers_predicate.hpp>
+#include <catch2/matchers/catch_matchers_templated.hpp>
+
+using Catch::Matchers::Equals;
+using Catch::Matchers::Predicate;
+
+
 
 template<typename T>
 bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer end, T const& val) {
@@ -11,6 +24,29 @@ bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer e
     }
     return true;
 }
+
+struct TokenEqualMatcher : Catch::Matchers::MatcherGenericBase {
+    TokenEqualMatcher(std::vector<std::string> const& tokens)
+    : tokens{ tokens } {
+
+    }
+
+    bool match(std::vector<ps::token> const& other) const {
+        return std::equal(tokens.begin(), tokens.end(),
+                          other.begin(), other.end(),
+                          [](std::string const& a, ps::token const& b) {
+                                     return a == b.str;
+                                }
+        );
+    }
+
+    std::string describe() const override {
+        return "Token strings equal: " + Catch::rangeToString(tokens);
+    }
+
+private:
+    std::vector<std::string> const& tokens;
+};
 
 TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
@@ -24,16 +60,16 @@ TEST_CASE("pscript context", "[context]") {
         ps::memory_pool const& memory = ctx.memory();
         ps::pointer p = 0;
 
-        REQUIRE(memory.verify_pointer(p));
+        CHECK(memory.verify_pointer(p));
         // Middle of address range
-        REQUIRE(memory.verify_pointer(p + memsize / 2));
+        CHECK(memory.verify_pointer(p + memsize / 2));
         // This is out of bounds
-        REQUIRE(!memory.verify_pointer(p + memsize));
+        CHECK(!memory.verify_pointer(p + memsize));
         // Null pointer can't be valid either
-        REQUIRE(!memory.verify_pointer(ps::null_pointer));
+        CHECK(!memory.verify_pointer(ps::null_pointer));
 
         // Verify that memory is zeroed out on construction
-        REQUIRE(range_equal(memory, memory.begin(), memory.end(), ps::byte{ 0x00 }));
+        CHECK(range_equal(memory, memory.begin(), memory.end(), ps::byte{ 0x00 }));
     }
 
     SECTION("memory allocation") {
@@ -44,13 +80,13 @@ TEST_CASE("pscript context", "[context]") {
         ps::pointer p1 = memory.allocate(2);
         ps::pointer p2 = memory.allocate(1000);
 
-        REQUIRE(memory.verify_pointer(p0));
-        REQUIRE(memory.verify_pointer(p1));
-        REQUIRE(memory.verify_pointer(p2));
+        CHECK(memory.verify_pointer(p0));
+        CHECK(memory.verify_pointer(p1));
+        CHECK(memory.verify_pointer(p2));
 
         // Impossible to allocate
         ps::pointer p3 = memory.allocate(memsize + 1000);
-        REQUIRE(p3 == ps::null_pointer);
+        CHECK(p3 == ps::null_pointer);
 
         memory.free(p0);
         memory.free(p1);
@@ -61,10 +97,35 @@ TEST_CASE("pscript context", "[context]") {
         ps::memory_pool& memory = ctx.memory();
 
         ps::variable& x = ctx.create_variable("x", 5);
-        REQUIRE(x.value().int_value(memory) == 5);
+        CHECK(x.value().int_value(memory) == 5);
 
         // Variable shadowing
         ps::variable& x_float = ctx.create_variable("x", 3.14f);
-        REQUIRE(x.value().fp_value(memory) == 3.14f);
+        CHECK(x.value().fp_value(memory) == 3.14f);
+    }
+}
+
+TEST_CASE("script creation", "[script]") {
+    constexpr std::size_t memsize = 1024 * 1024;
+    ps::context ctx(memsize);
+
+    SECTION("tokenizer") {
+        std::string src = "let x = 5;\nlet y = 9.7;";
+        ps::script script(std::move(src));
+
+        auto const& tokens = script.tokens();
+        CHECK_THAT(tokens, TokenEqualMatcher(
+            {"let", "x", "=", "5", ";", "let", "y", "=", "9.7", ";"}
+        ));
+
+        std::string src_with_function = "let z = function_call(a, 3.7, c, \"xyz\");";
+        ps::script script_funcs(std::move(src_with_function));
+        CHECK_THAT(script_funcs.tokens(), TokenEqualMatcher(
+        {"let", "z", "=", "function_call", "(", "a", ",", "3.7", ",", "c", ",", "\"xyz\"", ")", ";"}
+        ));
+    }
+
+    SECTION("lexer") {
+
     }
 }
