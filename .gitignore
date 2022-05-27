@@ -2,3 +2,4 @@
 out/
 build/
 .cache/
+cmake-build-debug/
