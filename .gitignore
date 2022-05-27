@@ -3,3 +3,5 @@ out/
 build/
 .cache/
 cmake-build-debug/
+cmake-build-debug-coverage/
+.idea/
