@@ -16,5 +16,11 @@ if(PLIB_ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-add_library(plib INTERFACE)
-target_include_directories(plib INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+# TODO: Add option to exclude pscript
+
+add_library(plib STATIC)
+target_sources(plib PRIVATE src/pscript/context.cpp src/pscript/memory.cpp)
+target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+# TODO: clang
+target_compile_options(plib PRIVATE /EHsc)
