@@ -7,8 +7,24 @@ namespace ps {
 
 class script;
 
+enum class token_type {
+    // identifiers
+    none,
+    identifier,
+    keyword,
+    // control tokens
+    brace,
+    parenthesis,
+    semicolon,
+    op,
+    comma,
+    // string, number, integer, etc
+    constant
+};
+
 struct token {
     std::string str {};
+    token_type type = token_type::none;
     // add source location information
 };
 

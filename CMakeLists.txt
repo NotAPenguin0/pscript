@@ -26,6 +26,7 @@ target_sources(plib PRIVATE
         src/pscript/variable.cpp
         src/pscript/script.cpp
         src/pscript/tokenizer.cpp
+        src/pscript/lexer.cpp
 )
 target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 

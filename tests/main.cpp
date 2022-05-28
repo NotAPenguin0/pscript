@@ -2,8 +2,23 @@
 #include <algorithm>
 #include <iostream>
 
+std::ostream& operator<<(std::ostream& out, ps::token_type const& type) {
+#define gen(name) if (type == ps::token_type:: name) return out << #name ;
+    gen(none)
+    gen(identifier)
+    gen(keyword)
+    gen(brace)
+    gen(parenthesis)
+    gen(semicolon)
+    gen(comma)
+    gen(op)
+    gen(constant)
+#undef gen
+    return out;
+}
+
 std::ostream& operator<<(std::ostream& out, ps::token const& tok) {
-    return out << tok.str;
+    return out << tok.str << '(' << tok.type << ')';
 }
 
 #include <catch2/catch_test_macros.hpp>
@@ -13,8 +28,6 @@ std::ostream& operator<<(std::ostream& out, ps::token const& tok) {
 
 using Catch::Matchers::Equals;
 using Catch::Matchers::Predicate;
-
-
 
 template<typename T>
 bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer end, T const& val) {
@@ -26,7 +39,7 @@ bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer e
 }
 
 struct TokenEqualMatcher : Catch::Matchers::MatcherGenericBase {
-    TokenEqualMatcher(std::vector<std::string> const& tokens)
+    explicit TokenEqualMatcher(std::vector<std::string> const& tokens)
     : tokens{ tokens } {
 
     }
@@ -46,6 +59,28 @@ struct TokenEqualMatcher : Catch::Matchers::MatcherGenericBase {
 
 private:
     std::vector<std::string> const& tokens;
+};
+
+struct TokenTypeMatcher : Catch::Matchers::MatcherGenericBase {
+    explicit TokenTypeMatcher(std::vector<ps::token_type> const& tokens) : tokens{tokens} {
+
+    }
+
+    bool match(std::vector<ps::token> const& other) const {
+        return std::equal(tokens.begin(), tokens.end(),
+                          other.begin(), other.end(),
+                          [](ps::token_type a, ps::token const& b) {
+                              return a == b.type;
+                          }
+        );
+    }
+
+    std::string describe() const override {
+        return "Token types equal: " + Catch::rangeToString(tokens);
+    }
+
+private:
+    std::vector<ps::token_type> const& tokens;
 };
 
 TEST_CASE("pscript context", "[context]") {
@@ -126,6 +161,12 @@ TEST_CASE("script creation", "[script]") {
     }
 
     SECTION("lexer") {
-
+        std::string src = "let z = function_call(a + 3, 3.7, c, \"xyz\");";
+        ps::script script(std::move(src));
+        CHECK_THAT(script.tokens(), TokenTypeMatcher(
+            {ps::token_type::keyword, ps::token_type::identifier, ps::token_type::op, ps::token_type::identifier, ps::token_type::parenthesis,
+             ps::token_type::identifier, ps::token_type::op, ps::token_type::constant, ps::token_type::comma, ps::token_type::constant, ps::token_type::comma,
+             ps::token_type::identifier, ps::token_type::comma, ps::token_type::constant, ps::token_type::parenthesis, ps::token_type::semicolon }
+        ));
     }
 }

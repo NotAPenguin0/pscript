@@ -1,6 +1,8 @@
 #include <pscript/tokenizer.hpp>
 #include <pscript/script.hpp>
 
+#include <pscript/syntax.hpp>
+
 #include <cstdlib>
 
 namespace ps {
@@ -40,8 +42,8 @@ static ps::token read_numerical_token(std::string const& source, std::size_t& po
 
 static ps::token read_string_token(std::string const& source, std::size_t& pos) {
     std::size_t start = pos;
-    pos += 1; // Increase by one so we don't end on the starting quote.
-    while(pos < source.size() && source[pos] != '\"') {
+    pos += 1; // Increase by one, so we don't end on the starting quote.
+    while(pos < source.size() && source[pos] != syntax::quote) {
         pos += 1;
     }
     pos += 1; // Include end quote
@@ -53,13 +55,14 @@ static ps::token read_control_token(std::string const& source, std::size_t& pos)
     std::size_t start = pos;
 
     // Control tokens that are always a single character
-    if (source[start] == ';'
-        || source[start] == '('
-        || source[start] == ')')  {
+    if (source[start] == syntax::semicolon
+        || source[start] == syntax::parens_open
+        || source[start] == syntax::parens_close
+        || source[start] == syntax::brace_open
+        || source[start] == syntax::brace_close)  {
         pos += 1;
         return token_from_range(source, start, start + 1);
     }
-
 
     while(pos < source.size() && !std::isspace(source[pos]) && !std::isalnum(source[pos])) {
         pos += 1;
@@ -79,7 +82,7 @@ static ps::token next_token(std::string const& source, std::size_t& pos) {
 
     // if the first character is a double quote, we found a string.
     // in this case we read until the next double quote.
-    if (first == '\"') {
+    if (first == syntax::quote) {
         return read_string_token(source, pos);
     }
 
