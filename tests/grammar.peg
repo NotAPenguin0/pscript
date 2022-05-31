@@ -1,11 +1,3 @@
-#include <pscript/context.hpp>
-
-#include <peglib.h>
-
-namespace ps {
-
-// Not too proud of this one, but moving to an external file is also not optimal
-static const char* grammar = R"(
 # --------------------------------
 # Explanation of basic PEG syntax:
 # --------------------------------
@@ -204,27 +196,3 @@ for_each <- 'let ' identifier space colon space expression
 # ================= comment =================
 
 comment <- '//' any '\n'
-)";
-
-context::context(std::size_t mem_size) : mem(mem_size) {
-    ast_parser = std::make_unique<peg::parser>(grammar);
-    ast_parser->enable_ast();
-}
-
-ps::memory_pool& context::memory() noexcept {
-    return mem;
-}
-
-ps::memory_pool const& context::memory() const noexcept {
-    return mem;
-}
-
-peg::parser const& context::parser() const noexcept {
-    return *ast_parser;
-}
-
-void context::execute(ps::script const& script) {
-
-}
-
-} // namespace ps

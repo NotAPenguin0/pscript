@@ -1,29 +1,35 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
-#include <pscript/tokenizer.hpp>
+namespace peg {
+    class parser;
+    struct EmptyType;
+    template<typename> struct AstBase;
+    using Ast = AstBase<EmptyType>;
+}
 
 namespace ps {
+
+class context;
 
 class script {
 public:
     // TODO: Add constructor from binary_input_stream maybe?
-    explicit script(std::string source);
+    explicit script(std::string source, ps::context& ctx);
 
     /**
      * @brief Get source code of the script
      */
-    std::string const& source() const;
+    [[nodiscard]] std::string const& source() const;
 
-    /**
-     * @brief Get list of tokens of the script
-     */
-    std::vector<ps::token> const& tokens() const;
+    [[nodiscard]] std::shared_ptr<peg::Ast> const& ast() const;
 
 private:
     std::string original_source {};
-    ps::tokenize_result tok_result {};
+
+    std::shared_ptr<peg::Ast> peg_ast {};
 };
 
 }

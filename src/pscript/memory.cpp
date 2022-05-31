@@ -131,6 +131,12 @@ void memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
             // Block must be in right child
             free_block(root->right.get(), root, ptr);
         }
+
+        // Once again try to merge
+        if (parent && parent->left->free && parent->right->free) {
+            bool success = merge_blocks(parent);
+            if (!success) return;
+        }
     }
 }
 

@@ -2,6 +2,9 @@
 #include <algorithm>
 #include <iostream>
 
+#include <pscript/tokenizer.hpp>
+#include <peglib.h> // usually not necessary, but we add this here so we can print the AST as a debug operation.
+
 std::ostream& operator<<(std::ostream& out, ps::token_type const& type) {
 #define gen(name) if (type == ps::token_type:: name) return out << #name ;
     gen(none)
@@ -144,29 +147,12 @@ TEST_CASE("script creation", "[script]") {
     constexpr std::size_t memsize = 1024 * 1024;
     ps::context ctx(memsize);
 
-    SECTION("tokenizer") {
-        std::string src = "let x = 5;\nlet y = 9.7;";
-        ps::script script(std::move(src));
+    SECTION("ast") {
+        std::string source = R"(
+            let x = 5;
+        )";
 
-        auto const& tokens = script.tokens();
-        CHECK_THAT(tokens, TokenEqualMatcher(
-            {"let", "x", "=", "5", ";", "let", "y", "=", "9.7", ";"}
-        ));
-
-        std::string src_with_function = "let z = function_call(a, 3.7, c, \"xyz\");";
-        ps::script script_funcs(std::move(src_with_function));
-        CHECK_THAT(script_funcs.tokens(), TokenEqualMatcher(
-        {"let", "z", "=", "function_call", "(", "a", ",", "3.7", ",", "c", ",", "\"xyz\"", ")", ";"}
-        ));
-    }
-
-    SECTION("lexer") {
-        std::string src = "let z = function_call(a + 3, 3.7, c, \"xyz\");";
-        ps::script script(std::move(src));
-        CHECK_THAT(script.tokens(), TokenTypeMatcher(
-            {ps::token_type::keyword, ps::token_type::identifier, ps::token_type::op, ps::token_type::identifier, ps::token_type::parenthesis,
-             ps::token_type::identifier, ps::token_type::op, ps::token_type::constant, ps::token_type::comma, ps::token_type::constant, ps::token_type::comma,
-             ps::token_type::identifier, ps::token_type::comma, ps::token_type::constant, ps::token_type::parenthesis, ps::token_type::semicolon }
-        ));
+        ps::script script(source, ctx);
+        std::cout << peg::ast_to_s(script.ast());
     }
 }

@@ -7,6 +7,10 @@
 #include <string>
 #include <unordered_map>
 
+namespace peg {
+    class parser;
+}
+
 namespace ps {
 
 /**
@@ -31,6 +35,12 @@ public:
      * @return Const reference to the memory pool.
      */
     [[nodiscard]] ps::memory_pool const& memory() const noexcept;
+
+    /**
+     * @brief Get a reference to the parser object used for parsing scripts.
+     * @return Const reference to a peg::parser.
+     */
+    [[nodiscard]] peg::parser const& parser() const noexcept;
 
     /**
      * @brief Creates a new variable with an initializer.
@@ -65,6 +75,8 @@ public:
 private:
     ps::memory_pool mem;
     std::unordered_map<std::string, ps::variable> variables;
+
+    std::unique_ptr<peg::parser> ast_parser;
 };
 
 }
