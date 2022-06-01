@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
+#include <stack>
 
 namespace peg {
     class parser;
@@ -52,21 +53,8 @@ public:
     [[nodiscard]] peg::parser const& parser() const noexcept;
 
     struct block_scope {
+        block_scope* parent = nullptr;
         std::unordered_map<std::string, ps::variable> local_variables;
-    };
-
-    struct function {
-        // refers to key in map
-        std::string_view name;
-        peg::Ast const* node = nullptr;
-        block_scope scope {};
-
-        struct parameter {
-            std::string name = "";
-            ps::value::type type {};
-        };
-        // parameters this function was declared with
-        std::vector<parameter> params;
     };
 
     /**
@@ -94,9 +82,30 @@ public:
     void execute(ps::script const& script);
 
 private:
+    struct function {
+        // refers to key in map
+        std::string_view name;
+        peg::Ast const* node = nullptr;
+
+        struct parameter {
+            std::string name = "";
+            ps::value::type type {};
+        };
+        // parameters this function was declared with
+        std::vector<parameter> params;
+    };
+
+    struct function_call {
+        function* func = nullptr;
+        block_scope* scope = nullptr;
+        bool returned = false;
+    };
+
     ps::memory_pool mem;
     std::unordered_map<std::string, ps::variable> global_variables;
     std::unordered_map<std::string, function> functions;
+
+    std::stack<function_call> call_stack {};
 
     std::unique_ptr<peg::parser> ast_parser;
 
@@ -113,7 +122,7 @@ private:
     std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope);
 
     // clears variables in scope, then creates variables for arguments.
-    void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func);
+    void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
 
     ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);

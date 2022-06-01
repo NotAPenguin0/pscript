@@ -194,7 +194,7 @@ TEST_CASE("script expression parser", "[script]") {
     }
 }
 
-TEST_CASE("script functions", "[script]") {
+TEST_CASE("script", "[script]") {
     constexpr std::size_t memsize = 128;
     ps::context ctx(memsize);
 
@@ -224,5 +224,66 @@ TEST_CASE("script functions", "[script]") {
 
         ps::script script(source, ctx);
         ctx.execute(script);
+    }
+
+    SECTION("local scopes") {
+        std::string source = R"(
+            fn foo() -> void {
+                let x = 5;
+                x = 10;
+            }
+
+            let x = 1;
+            foo();
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+        // after executing foo(), the  original value in 'x' should be unmodified.
+        CHECK(ctx.get_variable_value("x").int_value() == 1);
+    }
+}
+
+TEST_CASE("control sequences", "[script]") {
+    constexpr std::size_t memsize = 1024 * 1024;
+    ps::context ctx(memsize);
+
+    SECTION("if") {
+        std::string source = R"(
+            fn print(x: int) -> int {
+                // call builtin print function. eventually this version of print() will become library code (and call through std.io.print()).
+                return __print(x);
+            }
+
+            let x = 5;
+            let y = 10;
+            if (x < y) {
+                // should be able to look up x from parent scope
+                print(x);
+            } else {
+                print(y);
+            }
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("recursion") {
+        std::string source = R"(
+            fn fib(n: int) -> int {
+                if (n == 0) return 0;
+                if (n == 1) return 1;
+
+                return fib(n - 1) + fib(n - 2);
+            }
+
+            let f = fib(11);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+
+        CHECK(ctx.get_variable_value("f").int_value() == 89);
     }
 }

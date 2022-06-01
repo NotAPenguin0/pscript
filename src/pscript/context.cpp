@@ -269,9 +269,9 @@ ps::value& context::get_variable_value(std::string const& name, block_scope* sco
     auto& variables = scope ? scope->local_variables : global_variables;
     auto it = variables.find(name);
     if (it == variables.end()) {
-        // if we were looking in local scope, also try global scope
+        // if we were looking in local scope, also try parent scope
         if (scope) {
-            return get_variable_value(name, nullptr);
+            return get_variable_value(name, scope->parent);
         } else {
             throw std::runtime_error("variable not declared in current scope: " + name);
         }
@@ -285,6 +285,7 @@ void context::execute(ps::script const& script) {
 }
 
 ps::value context::execute(peg::Ast const* node, block_scope* scope) {
+    // TODO: Rework return value system to put return value in call stack instead!
     if (node_is_type(node, "declaration")) {
         evaluate_declaration(node, scope);
     }
@@ -300,21 +301,47 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope) {
     }
 
     auto update_ret = [&ret](ps::value&& v) {
-        if (ret.get_type() == ps::value::type::null) ret = std::move(v);
+        if (ret.is_null()) ret = std::move(v);
     };
+
+#define check_return() if (!call_stack.empty() && call_stack.top().returned) return ret
 
     if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
         for (auto const& child : node->nodes) {
             update_ret(execute(child.get(), scope));
+            check_return();
         }
     }
 
     if (node_is_type(node, "return")) {
+        call_stack.top().returned = true;
         // first child node of a return statement is the return expression.
         if (!node->nodes.empty()) {
             update_ret(evaluate_expression(node->nodes[0].get(), scope));
         }
     }
+
+    if (node_is_type(node, "if")) {
+        peg::Ast const* condition_node = find_child_with_type(node, "expression");
+        ps::value condition = evaluate_expression(condition_node, scope);
+        // If the condition evaluates to true, we can execute the compound block with a new scope
+        block_scope local_scope {};
+        local_scope.parent = scope;
+        if (static_cast<bool>(condition)) {
+            peg::Ast const* compound = find_child_with_type(node, "compound");
+            update_ret(execute(compound, &local_scope));
+            check_return();
+        } else {
+            // if an else block is present, execute it
+            peg::Ast const* else_block = find_child_with_type(node, "else");
+            if (else_block) {
+                update_ret(execute(find_child_with_type(else_block, "compound"), &local_scope));
+                check_return();
+            }
+        }
+    }
+
+#undef check_return
 
     return ret;
 }
@@ -392,6 +419,14 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     std::string op_str = op->token_to_string();
     if (op_str == "+") return left + right;
     if (op_str == "*") return left * right;
+    if (op_str == "-") return left - right;
+    if (op_str == "/") return left / right;
+    if (op_str == "==") return left == right;
+    if (op_str == "!=") return left != right;
+    if (op_str == "<") return left < right;
+    if (op_str == ">") return left > right;
+    if (op_str == ">=") return left >= right;
+    if (op_str == "<=") return left <= right;
     else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
 }
 
@@ -408,9 +443,9 @@ std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node
     return values;
 }
 
-void context::prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func) {
+void context::prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope) {
     using namespace std::literals::string_literals;
-    func->scope.local_variables.clear();
+    func_scope->parent = nullptr; // parent is global scope for function calls (as you can't access variables from previous scope, unlike in if statements).
 
     auto arguments = evaluate_argument_list(call_node, call_scope);
     // no work
@@ -421,7 +456,7 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
 
     // create variables with function arguments in call scope
     for (size_t i = 0; i < arguments.size(); ++i) {
-        ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), &func->scope);
+        ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), func_scope);
     }
 }
 
@@ -441,18 +476,26 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
         throw std::runtime_error("[func call] function " + func_name + " not found.\n");
     }
 
-    prepare_function_scope(node, scope, &it->second);
-    return execute(it->second.node, &it->second.scope);
+    // create function scope for this call
+    block_scope local_scope {};
+
+    prepare_function_scope(node, scope, &it->second, &local_scope);
+    call_stack.push(function_call {.func = &it->second, .scope = &local_scope, .returned = false});
+    ps::value val = execute(it->second.node, &local_scope);
+    call_stack.pop();
+    return val;
 }
 
 ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
     // builtin function: print
+    // TODO: print improvements (format string)
     if (name == "__print") {
         if (arguments.empty()) throw std::runtime_error("[__print()] invalid argument count.");
         ps::value const& to_print = arguments[0];
-        if (to_print.get_type() == ps::value::type::integer) std::cout << to_print.int_value() << std::endl;
-        else if (to_print.get_type() == ps::value::type::real) std::cout << to_print.real_value() << std::endl;
+        visit_value(to_print, [](auto const& val) {
+            std::cout << val << std::endl;
+        });
         // success
         return ps::value::from(memory(), 0);
     }
