@@ -135,6 +135,15 @@ void visit_value(value const& v, F&& callable) {
     return result;                                                                                   \
 }
 
+#define GEN_MUTABLE_OP(op) inline ps::value& operator op##= (ps::value& lhs, ps::value const& rhs) { \
+    visit_value(lhs, [&lhs, &rhs](auto const& lhs_val) {                                          \
+        visit_value(rhs, [&lhs, &lhs_val] (auto const& rhs_val) {                                 \
+           lhs = value::from(lhs.get_memory(), lhs_val op rhs_val);                               \
+        });                                                                                       \
+    });                                                                                           \
+    return lhs;                                                                                   \
+}
+
 GEN_VALUE_OP(+)
 GEN_VALUE_OP(-)
 GEN_VALUE_OP(*)
@@ -146,6 +155,13 @@ GEN_VALUE_OP(>)
 GEN_VALUE_OP(<=)
 GEN_VALUE_OP(>=)
 
+// +=, -=, *=, /=
+GEN_MUTABLE_OP(+)
+GEN_MUTABLE_OP(-);
+GEN_MUTABLE_OP(*);
+GEN_MUTABLE_OP(/);
+
 #undef GEN_VALUE_OP
+#undef GEN_MUTABLE_OP
 
 }

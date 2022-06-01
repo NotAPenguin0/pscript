@@ -37,7 +37,7 @@ content <- (comment / element / namespace_decl / function / struct)*
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' / '+=' / '-='
+operator <- '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '='
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -63,11 +63,12 @@ any <- [a-zA-Z0-9.,:;_-+-*/=?!() ]*
 # identifiers can only start with a lower or uppercase letter, and contain letters, numbers and underscores otherwise.
 identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
-literal <- string / number
+literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9] >
 string <- < quote [a-z]* quote >
+boolean <- < 'true' / 'false' >
 
 # ================= typenames =================
 
@@ -144,7 +145,7 @@ declaration <- 'let ' identifier space assign space expression
 
 # ================= compound statements
 
-compound <- element / (brace_open element* brace_close)
+compound <- element / (brace_open element* brace_close) { no_ast_opt }
 
 # ================= expressions =================
 
@@ -164,7 +165,7 @@ list_expression <- list_open argument_list? list_close
 # ----- operator expression -----
 op_expression <- atom (operator atom)* {
     precedence
-    L =
+    L = += -= *= /=
     L == != <= >= < >
     L - +
     L / *
@@ -182,7 +183,7 @@ argument <- expression
 
 # ----- if/else statement -----
 if <- 'if' parens_open expression parens_close compound else?
-else <- 'else' compound
+else <- 'else' compound { no_ast_opt }
 
 # ----- while statement -----
 while <- 'while' parens_open expression parens_close compound

@@ -73,6 +73,7 @@ public:
 
     [[nodiscard]] ps::variable& create_variable(std::string const& name, ps::value&& initializer, block_scope* scope = nullptr);
 
+    [[nodiscard]] ps::variable& get_variable(std::string const& name, block_scope* scope);
     [[nodiscard]] ps::value& get_variable_value(std::string const& name, block_scope* scope = nullptr);
 
     /**
@@ -98,7 +99,7 @@ private:
     struct function_call {
         function* func = nullptr;
         block_scope* scope = nullptr;
-        bool returned = false;
+        std::optional<ps::value> return_val = std::nullopt;
     };
 
     ps::memory_pool mem;

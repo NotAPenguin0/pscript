@@ -49,7 +49,7 @@ content <- (comment / element / namespace_decl / function / struct)*
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' / '+=' / '-='
+operator <- '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '='
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -75,11 +75,12 @@ any <- [a-zA-Z0-9.,:;_-+-*/=?!() ]*
 # identifiers can only start with a lower or uppercase letter, and contain letters, numbers and underscores otherwise.
 identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
-literal <- string / number
+literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9] >
 string <- < quote [a-z]* quote >
+boolean <- < 'true' / 'false' >
 
 # ================= typenames =================
 
@@ -156,7 +157,7 @@ declaration <- 'let ' identifier space assign space expression
 
 # ================= compound statements
 
-compound <- element / (brace_open element* brace_close)
+compound <- element / (brace_open element* brace_close) { no_ast_opt }
 
 # ================= expressions =================
 
@@ -176,7 +177,7 @@ list_expression <- list_open argument_list? list_close
 # ----- operator expression -----
 op_expression <- atom (operator atom)* {
     precedence
-    L =
+    L = += -= *= /=
     L == != <= >= < >
     L - +
     L / *
@@ -194,7 +195,7 @@ argument <- expression
 
 # ----- if/else statement -----
 if <- 'if' parens_open expression parens_close compound else?
-else <- 'else' compound
+else <- 'else' compound { no_ast_opt }
 
 # ----- while statement -----
 while <- 'while' parens_open expression parens_close compound
@@ -265,19 +266,25 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
     }
 }
 
-ps::value& context::get_variable_value(std::string const& name, block_scope* scope) {
+
+ps::variable& context::get_variable(std::string const& name, block_scope* scope) {
     auto& variables = scope ? scope->local_variables : global_variables;
     auto it = variables.find(name);
     if (it == variables.end()) {
         // if we were looking in local scope, also try parent scope
         if (scope) {
-            return get_variable_value(name, scope->parent);
+            return get_variable(name, scope->parent);
         } else {
             throw std::runtime_error("variable not declared in current scope: " + name);
         }
     }
-    else return it->second.value();
+    else return it->second;
 }
+
+ps::value& context::get_variable_value(std::string const& name, block_scope* scope) {
+    return get_variable(name, scope).value();
+}
+
 
 void context::execute(ps::script const& script) {
     std::shared_ptr<peg::Ast> const& ast = script.ast();
@@ -294,30 +301,32 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope) {
         evaluate_function_definition(node);
     }
 
-    ps::value ret = ps::value::null();
-
     if (node_is_type(node, "call_expression")) {
         return evaluate_function_call(node, scope);
     }
 
-    auto update_ret = [&ret](ps::value&& v) {
-        if (ret.is_null()) ret = std::move(v);
-    };
+    // sometimes expressions can occur "in the wild", for example 'n = 5' or 'n += 6'
+    if (node_is_type(node, "op_expression")) {
+        evaluate_expression(node, scope);
+    }
 
-#define check_return() if (!call_stack.empty() && call_stack.top().returned) return ret
+    auto has_returned = [this]() {
+        return !call_stack.empty() && call_stack.top().return_val != std::nullopt;
+    };
 
     if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
         for (auto const& child : node->nodes) {
-            update_ret(execute(child.get(), scope));
-            check_return();
+            execute(child.get(), scope);
+
+            if (has_returned()) return *call_stack.top().return_val;
         }
     }
 
     if (node_is_type(node, "return")) {
-        call_stack.top().returned = true;
+        call_stack.top().return_val = ps::value::null();
         // first child node of a return statement is the return expression.
         if (!node->nodes.empty()) {
-            update_ret(evaluate_expression(node->nodes[0].get(), scope));
+            call_stack.top().return_val = evaluate_expression(node->nodes[0].get(), scope);
         }
     }
 
@@ -329,21 +338,28 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope) {
         local_scope.parent = scope;
         if (static_cast<bool>(condition)) {
             peg::Ast const* compound = find_child_with_type(node, "compound");
-            update_ret(execute(compound, &local_scope));
-            check_return();
+            execute(compound, &local_scope);
         } else {
             // if an else block is present, execute it
             peg::Ast const* else_block = find_child_with_type(node, "else");
             if (else_block) {
-                update_ret(execute(find_child_with_type(else_block, "compound"), &local_scope));
-                check_return();
+                execute(find_child_with_type(else_block, "compound"), &local_scope);
             }
         }
     }
 
-#undef check_return
+    if (node_is_type(node, "while")) {
+        peg::Ast const* condition_node = find_child_with_type(node, "expression");
+        peg::Ast const* compound = find_child_with_type(node, "compound");
+        while(static_cast<bool>(evaluate_expression(condition_node, scope))) {
+            block_scope local_scope {};
+            local_scope.parent = scope;
+            execute(compound, &local_scope);
+        }
+    }
 
-    return ret;
+    if (has_returned()) return *call_stack.top().return_val;
+    else return ps::value::null();
 }
 
 peg::Ast const* context::find_child_with_type(peg::Ast const* node, std::string_view type) const noexcept {
@@ -427,6 +443,18 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == ">") return left > right;
     if (op_str == ">=") return left >= right;
     if (op_str == "<=") return left <= right;
+
+    // all other operators are 'mutable' operators, meaning they modify the left-hand side in some way or another.
+    // in this case we would like to find out if the left side is an assignable identifier.
+    // if so, we do the assignment
+    std::string tok = lhs->token_to_string();
+    ps::variable& var = get_variable(tok, scope);
+    if (op_str == "=") return var.value() = right;
+    if (op_str == "+=") return var.value() += right;
+    if (op_str == "-=") return var.value() -= right;
+    if (op_str == "*=") return var.value() *= right;
+    if (op_str == "/=") return var.value() /= right;
+
     else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
 }
 
@@ -480,7 +508,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     block_scope local_scope {};
 
     prepare_function_scope(node, scope, &it->second, &local_scope);
-    call_stack.push(function_call {.func = &it->second, .scope = &local_scope, .returned = false});
+    call_stack.push(function_call {.func = &it->second, .scope = &local_scope });
     ps::value val = execute(it->second.node, &local_scope);
     call_stack.pop();
     return val;

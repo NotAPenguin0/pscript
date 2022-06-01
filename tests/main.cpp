@@ -245,7 +245,7 @@ TEST_CASE("script", "[script]") {
 }
 
 TEST_CASE("control sequences", "[script]") {
-    constexpr std::size_t memsize = 1024 * 1024;
+    constexpr std::size_t memsize = 512;
     ps::context ctx(memsize);
 
     SECTION("if") {
@@ -273,9 +273,8 @@ TEST_CASE("control sequences", "[script]") {
         std::string source = R"(
             fn fib(n: int) -> int {
                 if (n == 0) return 0;
-                if (n == 1) return 1;
-
-                return fib(n - 1) + fib(n - 2);
+                else if (n == 1) return 1;
+                else return fib(n - 1) + fib(n - 2);
             }
 
             let f = fib(11);
@@ -285,5 +284,25 @@ TEST_CASE("control sequences", "[script]") {
         ctx.execute(script);
 
         CHECK(ctx.get_variable_value("f").int_value() == 89);
+    }
+
+    SECTION("while") {
+        std::string source = R"(
+            fn triangle(n: int) -> int {
+                let a = 0;
+                while(n > 0) {
+                    a += n;
+                    n -= 1;
+                }
+                return a;
+            }
+
+            let t = triangle(5);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+
+        CHECK(ctx.get_variable_value("t").int_value() == 15);
     }
 }
