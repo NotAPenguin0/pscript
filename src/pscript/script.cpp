@@ -7,7 +7,9 @@ namespace ps {
 
 script::script(std::string source, ps::context& ctx) : original_source(std::move(source)) {
     // Parse script into its AST.
-    ctx.parser().parse(original_source, peg_ast);
+    peg::parser const& parser = ctx.parser();
+    parser.parse(original_source, peg_ast);
+    peg_ast = parser.optimize_ast(peg_ast);
 }
 
 std::string const& script::source() const {

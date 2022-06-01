@@ -42,8 +42,8 @@ unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
 quote <- '"'
-parens_open <- '('
-parens_close <- ')'
+parens_open <- < '(' >
+parens_close <- < ')' >
 brace_open <- '{'
 brace_close <- '}'
 list_open <- '['
@@ -54,14 +54,14 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_-+-*/=?! ]*
+any <- [a-zA-Z0-9.,:;_-+-*/=?!() ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
 # ================= identifiers and literals =================
 
 # identifiers can only start with a lower or uppercase letter, and contain letters, numbers and underscores otherwise.
-identifier <- [a-zA-Z] [a-zA-Z_0-9]*
+identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
 literal <- string / number
 number <- float / integer
@@ -73,7 +73,7 @@ string <- < quote [a-z]* quote >
 
 typename <- builtin_type / namespace_list? identifier
 # typenames can be prefixed by namespace qualifiers
-namespace_list <- (namespace '.')+
+namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
 # match builtin types separately for easier interpreting
 builtin_type <- 'int' / 'float' / 'str' / 'list'
@@ -85,7 +85,7 @@ namespace_decl <- 'namespace ' identifier space brace_open content brace_close
 # ================= functions =================
 
 # for functions we need to be able to create parameter lists.
-parameter_list <- parameter (comma parameter)*
+parameter_list <- parameter (comma parameter)* { no_ast_opt }
 parameter <- identifier colon typename
 
 # a function can either be an externally declared function, or a function definition.
@@ -96,6 +96,8 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
+
+builtin_function <- '__print'
 
 # ================= structs =================
 
@@ -109,7 +111,7 @@ struct_item <- identifier colon typename struct_initializer?
 struct_initializer <- assign expression
 
 # basic statement, control structure such as if/while, or a for loop.
-element <- statement / if / while / for
+element <- comment / statement / if / while / for
 
 # ================= statements =================
 
@@ -134,7 +136,7 @@ module_name <- identifier
 
 # ================= return statements =================
 
-return <- 'return ' expression?
+return <- 'return ' expression? { no_ast_opt }
 
 # ================= variable declarations =================
 
@@ -172,8 +174,8 @@ atom <- unary_operator? (parens_open expression parens_close / call_expression /
 operand <- < literal / identifier >
 
 # ----- call expression -----
-call_expression <- identifier space parens_open argument_list? parens_close
-argument_list <- argument ( comma argument )*
+call_expression <- namespace_list? (identifier / builtin_function) space parens_open argument_list? parens_close
+argument_list <- argument ( comma argument )* { no_ast_opt }
 argument <- expression
 
 # ================= control sequences =================

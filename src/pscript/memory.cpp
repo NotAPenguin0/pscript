@@ -100,43 +100,59 @@ void memory_pool::verify_pointer_throw(ps::pointer ptr) const {
     return find_block(root->right.get(), block_size);
 }
 
-void memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
+bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
     // We need to find the block holding the allocated pointer.
     // This is going to be the block with the free flag on false, and holding this pointer.
 
-    if (!root) return;
+    if (!root) return false;
 
     // Found matching pointer. This will be the allocated block if it has no child buddies.
     if (root->ptr == ptr && !root->left && !root->right) {
         // Mark the block as free
         root->free = true;
+        // Zero out block memory
+        std::memset(decode_pointer(root->ptr), 0, root->size);
         // If there is a parent, check if both left and right of it are free
         if (parent && parent->left->free && parent->right->free) {
             // If so, merge those blocks
             bool success = merge_blocks(parent);
             // Something went wrong
-            if (!success) return;
+            if (!success) return false;
         }
+        return true; // freed a block, return true
+
     } else {
         // This isn't the block holding the allocation, try to free in left and right
 
         // Has no children, early exit.
-        if (!root->left || !root->right) return;
+        if (!root->left || !root->right) return false;
 
         // We can make a small optimization by comparing the pointer with the pointer of the right child.
         if (ptr < root->right->ptr) {
             // Block must be in left child
-            free_block(root->left.get(), root, ptr);
+            bool free = free_block(root->left.get(), root, ptr);
+
+            // Once again try to merge
+            if (free && parent && parent->free && parent->left->free && parent->right->free) {
+                bool success = merge_blocks(parent);
+                if (!success) return false;
+            }
+
+            return free;
         } else {
             // Block must be in right child
-            free_block(root->right.get(), root, ptr);
+            bool free = free_block(root->right.get(), root, ptr);
+
+            // Once again try to merge
+            if (free && parent && parent->free && parent->left->free && parent->right->free) {
+                bool success = merge_blocks(parent);
+                if (!success) return false;
+            }
+
+            return free;
         }
 
-        // Once again try to merge
-        if (parent && parent->left->free && parent->right->free) {
-            bool success = merge_blocks(parent);
-            if (!success) return;
-        }
+        return false;
     }
 }
 
@@ -149,6 +165,8 @@ void memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
     if (b->left || b->right) return false;
 
     std::size_t new_size = b->size / 2;
+
+    b->free = false; // divided blocks must be marked non-free
 
     // Left block starts at same pointer, with new_size bytes
     b->left = std::make_unique<block>();
@@ -170,6 +188,7 @@ void memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
     // Once validated, merging is very simple: just set left and right to null.
     parent->left = nullptr;
     parent->right = nullptr;
+    parent->free = true;
 
     return true;
 }

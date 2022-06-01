@@ -2,6 +2,10 @@
 
 namespace ps {
 
+variable::variable(std::string_view name, ps::value&& initializer) : var_name(name), val(std::move(initializer)) {
+
+}
+
 void variable::set_name(std::string_view name) {
     var_name = name;
 }

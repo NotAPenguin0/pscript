@@ -17,6 +17,8 @@ public:
 
     }
 
+    variable(std::string_view name, ps::value&& initializer);
+
     std::string_view name() const;
     void set_name(std::string_view name);
 

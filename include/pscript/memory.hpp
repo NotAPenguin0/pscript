@@ -118,7 +118,7 @@ private:
 
     // Descends the tree to find the block holding the pointer and frees this block.
     // Possibly also merges it with its buddy.
-    void free_block(block* root, block* parent, ps::pointer ptr);
+    bool free_block(block* root, block* parent, ps::pointer ptr);
 
     // Divides a block into two buddies.
     // If the block is already the minimum size, this does nothing and returns false, otherwise it returns true.
