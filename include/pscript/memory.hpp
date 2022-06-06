@@ -82,6 +82,20 @@ public:
     [[nodiscard]] ps::pointer allocate(std::size_t bytes);
 
     /**
+     * @brief Allocates memory from the pool to fit a type T and constructs a default T at that location.
+     * @tparam T Type to allocate memory for.
+     * @return Pointer to the allocated memory, or null_pointer on failure.
+     */
+    template<typename T>
+    [[nodiscard]] ps::pointer allocate() {
+        ps::pointer ptr = allocate(sizeof(T));
+        if (ptr == ps::null_pointer) return ptr;
+        T* address = reinterpret_cast<T*>(decode_pointer(ptr));
+        new (address) T {};
+        return ptr;
+    }
+
+    /**
      * @brief Free a previously allocated pointer (from allocate()).
      * @param ptr Pointer to free. If null, this function does nothing.
      */

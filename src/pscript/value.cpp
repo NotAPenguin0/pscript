@@ -85,9 +85,9 @@ ps::value value::from(ps::memory_pool& memory, int v) {
     ps::value val {};
     val.memory = &memory;
     val.tpe = type::integer;
-    val.ptr = memory.allocate(sizeof(ps::types::integer));
+    val.ptr = memory.allocate<ps::integer>();
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
-    memory.get<ps::types::integer>(val.ptr) = v;
+    memory.get<ps::integer>(val.ptr) = v;
     return val;
 }
 
@@ -95,9 +95,9 @@ ps::value value::from(ps::memory_pool& memory, float v) {
     ps::value val {};
     val.memory = &memory;
     val.tpe = type::real;
-    val.ptr = memory.allocate(sizeof(ps::types::real));
+    val.ptr = memory.allocate<ps::real>();
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
-    memory.get<ps::types::real>(val.ptr) = v;
+    memory.get<ps::real>(val.ptr) = v;
     return val;
 }
 
@@ -105,9 +105,9 @@ ps::value value::from(ps::memory_pool& memory, bool v) {
     ps::value val {};
     val.memory = &memory;
     val.tpe = type::boolean;
-    val.ptr = memory.allocate(sizeof(ps::types::boolean));
+    val.ptr = memory.allocate<ps::boolean>();
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
-    memory.get<ps::types::boolean>(val.ptr) = v;
+    memory.get<ps::boolean>(val.ptr) = v;
     return val;
 }
 
@@ -115,24 +115,24 @@ ps::pointer value::pointer() {
     return ptr;
 }
 
-ps::value::type value::get_type() const {
+ps::type value::get_type() const {
     return tpe;
 }
 
-ps::types::integer& value::int_value() {
-    return memory->get<ps::types::integer>(ptr);
+ps::integer& value::int_value() {
+    return memory->get<ps::integer>(ptr);
 }
 
-ps::types::real& value::real_value() {
-    return memory->get<ps::types::real>(ptr);
+ps::real& value::real_value() {
+    return memory->get<ps::real>(ptr);
 }
 
-ps::types::integer const& value::int_value() const {
-    return memory->get<ps::types::integer>(ptr);
+ps::integer const& value::int_value() const {
+    return memory->get<ps::integer>(ptr);
 }
 
-ps::types::real const& value::real_value() const {
-    return memory->get<ps::types::real>(ptr);
+ps::real const& value::real_value() const {
+    return memory->get<ps::real>(ptr);
 }
 
 }

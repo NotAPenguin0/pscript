@@ -90,7 +90,7 @@ private:
 
         struct parameter {
             std::string name = "";
-            ps::value::type type {};
+            ps::type type {};
         };
         // parameters this function was declared with
         std::vector<parameter> params;

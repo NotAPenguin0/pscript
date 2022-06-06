@@ -2,33 +2,277 @@
 
 #include <pscript/memory.hpp>
 
+#include <plib/concepts.hpp>
+
+#include <vector>
+#include <exception>
+#include <stdexcept>
+#include <iostream>
+
 namespace ps {
 
-namespace types {
+class value;
 
-using integer = int;
-using real = float;
-using boolean = bool;
+enum class type {
+    null,
+    integer,
+    // float
+    real,
+    boolean,
+    str,
+    list,
+    // external functions or classes.
+    external_object
+};
 
+template<typename T>
+class value_storage {
+public:
+    using value_type = T;
+
+    value_storage() = default;
+
+    explicit value_storage(T const& v) : val(v) {
+
+    }
+
+    value_storage(value_storage const& rhs) : val(rhs.value) {
+
+    }
+
+    value_storage(value_storage&& rhs)  noexcept : val(std::move(rhs.val)) {
+
+    }
+
+    value_storage& operator=(T const& rhs) {
+        val = rhs;
+        return *this;
+    }
+
+    value_storage& operator=(value_storage const& rhs) {
+        val = rhs.val;
+        return *this;
+    }
+
+    value_storage& operator=(value_storage&& rhs) noexcept {
+        val = std::move(rhs.val);
+        return *this;
+    }
+
+    explicit operator T& () {
+        return val;
+    }
+
+    explicit operator T const& () const {
+        return val;
+    }
+
+    T& value() {
+        return val;
+    }
+
+    T const& value() const {
+        return val;
+    }
+
+protected:
+    T val = {};
+};
+
+template<typename T>
+class eq_comparable : public value_storage<T> {
+public:
+    using value_storage<T>::value_storage;
+    using value_storage<T>::operator=;
+};
+
+template<typename T>
+class rel_comparable : public eq_comparable<T> {
+public:
+    using eq_comparable<T>::eq_comparable;
+    using eq_comparable<T>::operator=;
+};
+
+template<typename T>
+class arithmetic_type : public rel_comparable<T> {
+public:
+    using rel_comparable<T>::rel_comparable;
+    using rel_comparable<T>::operator=;
+};
+
+// Fallbacks
+
+template<typename T, typename U>
+bool operator==(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator== not supported for this type");
 }
+
+template<typename T, typename U>
+bool operator!=(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator!= not supported for this type");
+}
+
+template<typename T, typename U>
+bool operator<(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator< not supported for this type");
+}
+
+template<typename T, typename U>
+bool operator<=(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator<= not supported for this type");
+}
+
+template<typename T, typename U>
+bool operator>(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator> not supported for this type");
+}
+
+template<typename T, typename U>
+bool operator>=(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator>= not supported for this type");
+}
+
+template<typename T, typename U>
+T operator+(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator+ not supported for this type");
+}
+
+template<typename T, typename U>
+T operator-(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator- not supported for this type");
+}
+
+template<typename T, typename U>
+T operator*(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator* not supported for this type");
+}
+
+template<typename T, typename U>
+T operator/(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator/ not supported for this type");
+}
+
+template<typename T>
+std::ostream& operator<<(std::ostream& out, value_storage<T> const& value) {
+    return out << value.value();
+}
+
+// Actual implementations for types that do support the operations.
+
+template<typename T, typename U> requires std::equality_comparable_with<T, U>
+bool operator==(eq_comparable<T> const& lhs, eq_comparable<U> const& rhs) {
+    return lhs.value() == rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::equality_comparable_with<T, U>
+bool operator==(eq_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() == rhs;
+}
+
+template<typename T, typename U> requires std::equality_comparable_with<T, U>
+bool operator!=(eq_comparable<T> const& lhs, eq_comparable<U> const& rhs) {
+    return lhs.value() != rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::equality_comparable_with<T, U>
+bool operator!=(eq_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() != rhs;
+}
+
+template<typename T, typename U> requires std::totally_ordered_with<T, U>
+bool operator<(rel_comparable<T> const& lhs, rel_comparable<U> const& rhs) {
+    return lhs.value() < rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::totally_ordered_with<T, U>
+bool operator<(rel_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() < rhs;
+}
+
+template<typename T, typename U> requires std::totally_ordered_with<T, U>
+bool operator<=(rel_comparable<T> const& lhs, rel_comparable<U> const& rhs) {
+    return lhs.value() <= rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::totally_ordered_with<T, U>
+bool operator<=(rel_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() <= rhs;
+}
+
+template<typename T, typename U> requires std::totally_ordered_with<T, U>
+bool operator>(rel_comparable<T> const& lhs, rel_comparable<U> const& rhs) {
+    return lhs.value() > rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::totally_ordered_with<T, U>
+bool operator>(rel_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() > rhs;
+}
+
+template<typename T, typename U> requires std::totally_ordered_with<T, U>
+bool operator>=(rel_comparable<T> const& lhs, rel_comparable<U> const& rhs) {
+    return lhs.value() >= rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && std::totally_ordered_with<T, U>
+bool operator>=(rel_comparable<T> const& lhs, U const& rhs) {
+    return lhs.value() >= rhs;
+}
+
+template<typename T, typename U> requires plib::adds<T, U>
+std::common_type_t<T, U> operator+(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() + rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::adds<T, U>
+std::common_type_t<T, U> operator+(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() + rhs;
+}
+
+template<typename T, typename U> requires plib::subtracts<T, U>
+std::common_type_t<T, U> operator-(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() - rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::subtracts<T, U>
+std::common_type_t<T, U> operator-(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() - rhs;
+}
+
+template<typename T, typename U> requires plib::multiplies<T, U>
+std::common_type_t<T, U> operator*(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() * rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::multiplies<T, U>
+std::common_type_t<T, U> operator*(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() * rhs;
+}
+
+template<typename T, typename U> requires plib::divides<T, U>
+std::common_type_t<T, U> operator/(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() / rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::divides<T, U>
+std::common_type_t<T, U> operator/(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() / rhs;
+}
+
+class list_type {
+
+};
+
+using integer = arithmetic_type<int>;
+using real = arithmetic_type<float>;
+using boolean = eq_comparable<bool>;
+using list = value_storage<list_type>;
 
 /**
  * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).
  */
 class value {
 public:
-    enum class type {
-        null,
-        integer,
-        // float
-        real,
-        boolean,
-        str,
-        list,
-        // external functions or classes.
-        external_object
-    };
-
     value(value const& rhs);
     value& operator=(value const& rhs);
 
@@ -49,11 +293,11 @@ public:
 
     inline bool is_null() const { return tpe == type::null; }
 
-    ps::types::integer& int_value();
-    ps::types::real& real_value();
+    ps::integer& int_value();
+    ps::real& real_value();
 
-    ps::types::integer const& int_value() const;
-    ps::types::real const& real_value() const;
+    ps::integer const& int_value() const;
+    ps::real const& real_value() const;
 
     template<typename T>
     explicit operator T&() {
@@ -82,22 +326,25 @@ private:
 template<typename F>
 void visit_value(value& v, F&& callable) {
     switch(v.get_type()) {
-        case value::type::null:
+        case type::null:
             break;
-        case value::type::integer:
-            callable(static_cast<types::integer&>(v));
+        case type::integer:
+            callable(static_cast<ps::integer&>(v));
             break;
-        case value::type::real:
-            callable(static_cast<types::real&>(v));
+        case type::real:
+            callable(static_cast<ps::real&>(v));
             break;
-        case value::type::boolean:
-            callable(static_cast<types::boolean&>(v));
+        case type::boolean:
+            callable(static_cast<ps::boolean&>(v));
             break;
-        case value::type::str:
+        case type::str:
             break;
-        case value::type::list:
+        case type::list:
+            callable(static_cast<ps::list&>(v));
             break;
-        case value::type::external_object:
+        case type::external_object:
+            break;
+        default:
             break;
     }
 }
@@ -105,22 +352,23 @@ void visit_value(value& v, F&& callable) {
 template<typename F>
 void visit_value(value const& v, F&& callable) {
     switch(v.get_type()) {
-        case value::type::null:
+        case type::null:
             break;
-        case value::type::integer:
-            callable(static_cast<types::integer const&>(v));
+        case type::integer:
+            callable(static_cast<ps::integer const&>(v));
             break;
-        case value::type::real:
-            callable(static_cast<types::real const&>(v));
+        case type::real:
+            callable(static_cast<ps::real const&>(v));
             break;
-        case value::type::boolean:
-            callable(static_cast<types::boolean const&>(v));
+        case type::boolean:
+            callable(static_cast<ps::boolean const&>(v));
             break;
-        case value::type::str:
+        case type::str:
             break;
-        case value::type::list:
+        case type::list:
+            callable(static_cast<ps::list const&>(v));
             break;
-        case value::type::external_object:
+        case type::external_object:
             break;
     }
 }
@@ -163,5 +411,34 @@ GEN_MUTABLE_OP(/);
 
 #undef GEN_VALUE_OP
 #undef GEN_MUTABLE_OP
+
+}
+
+namespace std {
+
+template<typename T, typename U>
+struct common_type<ps::value_storage<T>, U> {
+    using type = typename common_type<T, U>::type;
+};
+
+template<typename T, typename U>
+struct common_type<ps::eq_comparable<T>, U> {
+    using type = typename common_type<T, U>::type;
+};
+
+template<typename T, typename U>
+struct common_type<ps::rel_comparable<T>, U> {
+    using type = typename common_type<T, U>::type;
+};
+
+template<typename T, typename U>
+struct common_type<ps::arithmetic_type<T>, U> {
+    using type = typename common_type<T, U>::type;
+};
+
+template<typename T>
+struct common_type<T, ps::list_type> {
+    using type = void;
+};
 
 }

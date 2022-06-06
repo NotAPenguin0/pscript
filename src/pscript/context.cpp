@@ -413,9 +413,9 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
     // integer or floating point literal
     if (std::isdigit(str_repr[0])) {
         if (str_repr.find('.') != std::string::npos) {
-            return ps::value::from(memory(), node->token_to_number<ps::types::real>());
+            return ps::value::from(memory(), node->token_to_number<ps::real::value_type>());
         } else {
-            return ps::value::from(memory(), node->token_to_number<ps::types::integer>());
+            return ps::value::from(memory(), node->token_to_number<ps::integer::value_type>());
         }
     }
 
