@@ -260,13 +260,22 @@ std::common_type_t<T, U> operator/(arithmetic_type<T> const& lhs, U const& rhs) 
 }
 
 class list_type {
+public:
+    list_type() = default;
+    explicit list_type(std::vector<ps::value> const& values);
+    list_type(list_type const&) = default;
+    list_type(list_type&&) noexcept = default;
+    list_type& operator=(list_type const&) = default;
+    list_type& operator=(list_type&&) noexcept = default;
 
+    void append(ps::value const& val);
+
+    friend std::ostream& operator<<(std::ostream& out, list_type const& list);
+
+private:
+    std::vector<ps::value> storage;
+    type stored_type {};
 };
-
-inline std::ostream& operator<<(std::ostream& out, list_type const& list) {
-    // TODO
-    return out;
-}
 
 using integer = arithmetic_type<int>;
 using real = arithmetic_type<float>;

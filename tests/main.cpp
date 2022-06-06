@@ -306,3 +306,21 @@ TEST_CASE("control sequences", "[script]") {
         CHECK(ctx.get_variable_value("t").int_value() == 15);
     }
 }
+
+TEST_CASE("lists") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    SECTION("append") {
+        std::string source = R"(
+            let my_list = [1, 2, 3];
+            my_list.append(4);
+            my_list.append(5);
+            my_list.append(6.6);
+            __print(my_list);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}

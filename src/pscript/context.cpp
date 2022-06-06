@@ -183,7 +183,7 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (parens_open expression parens_close / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (parens_open expression parens_close / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
@@ -268,17 +268,23 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
 
 
 ps::variable& context::get_variable(std::string const& name, block_scope* scope) {
+    ps::variable* var = find_variable(name, scope);
+    if (!var) throw std::runtime_error("variable not declared in current scope: " + name);
+    else return *var;
+}
+
+[[nodiscard]] ps::variable* context::find_variable(std::string const& name, block_scope* scope) {
     auto& variables = scope ? scope->local_variables : global_variables;
     auto it = variables.find(name);
     if (it == variables.end()) {
         // if we were looking in local scope, also try parent scope
         if (scope) {
-            return get_variable(name, scope->parent);
+            return find_variable(name, scope->parent);
         } else {
-            throw std::runtime_error("variable not declared in current scope: " + name);
+            return nullptr;
         }
     }
-    else return it->second;
+    else return &it->second;
 }
 
 ps::value& context::get_variable_value(std::string const& name, block_scope* scope) {
@@ -471,6 +477,18 @@ std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node
     return values;
 }
 
+std::string context::parse_namespace(peg::Ast const* node) {
+    std::string result;
+    for (auto const& child : node->nodes) {
+        if (node_is_type(child.get(), "namespace")) {
+            result += ('.' + child->token_to_string());
+        }
+    }
+    // remove first dot
+    result.erase(0, 1);
+    return result;
+}
+
 void context::prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope) {
     using namespace std::literals::string_literals;
     func_scope->parent = nullptr; // parent is global scope for function calls (as you can't access variables from previous scope, unlike in if statements).
@@ -499,6 +517,23 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     // TODO: implement namespaces
     std::string func_name = func_identifier_node->token_to_string();
 
+    std::string namespace_name;
+    if (namespace_identifier) {
+        namespace_name = parse_namespace(namespace_identifier);
+    }
+
+    if (!namespace_name.empty()) {
+        // check if namespace name is a variable, if so we are calling a builtin member function (for list objects for example).
+        ps::variable* var = find_variable(namespace_name, scope);
+
+        if (var) {
+            ps::type const type = var->value().get_type();
+            if (type == ps::type::list) {
+                return evaluate_list_member_function(func_name, *var, node, scope);
+            }
+        }
+    }
+
     auto it = functions.find(func_name);
     if (it == functions.end()) {
         throw std::runtime_error("[func call] function " + func_name + " not found.\n");
@@ -512,6 +547,17 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     ps::value val = execute(it->second.node, &local_scope);
     call_stack.pop();
     return val;
+}
+
+ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
+    auto arguments = evaluate_argument_list(node, scope);
+
+    if (name == "append") {
+        if (arguments.size() != 1) throw std::runtime_error("[list::append] - expected 1 argument");
+        static_cast<ps::list&>(object.value()).value().append(arguments.front());
+    }
+
+    return ps::value::null();
 }
 
 ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
@@ -529,6 +575,11 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     }
 
     return ps::value::null();
+}
+
+ps::value context::evaluate_list(peg::Ast const* node, block_scope* scope) {
+   auto arguments = evaluate_argument_list(node, scope);
+   return ps::value::from(memory(), ps::list_type{ arguments });
 }
 
 ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope) {
@@ -558,6 +609,10 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
         peg::Ast const* rhs_node = node->nodes[2].get();
 
         return evaluate_operator(lhs_node, operator_node, rhs_node, scope);
+    }
+
+    if (node_is_type(node, "list_expression")) {
+        return evaluate_list(node, scope);
     }
 
     return ps::value::null();

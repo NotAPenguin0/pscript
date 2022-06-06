@@ -171,7 +171,7 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (parens_open expression parens_close / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (parens_open expression parens_close / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----

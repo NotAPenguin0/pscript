@@ -114,6 +114,8 @@ private:
 
     peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) const noexcept;
 
+    [[nodiscard]] ps::variable* find_variable(std::string const& name, block_scope* scope);
+
     // checks both name and original_name
     bool node_is_type(peg::Ast const* node, std::string_view type) const noexcept;
 
@@ -122,15 +124,19 @@ private:
 
     std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope);
 
+    std::string parse_namespace(peg::Ast const* node);
+
     // clears variables in scope, then creates variables for arguments.
     void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
 
     ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
 
     ps::value evaluate_operand(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope);
     ps::value evaluate_expression(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
 };
 
 }

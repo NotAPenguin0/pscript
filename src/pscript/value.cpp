@@ -4,6 +4,30 @@
 
 namespace ps {
 
+list_type::list_type(std::vector<ps::value> const& values) {
+    storage = values;
+    if (!values.empty()) {
+        stored_type = values.front().get_type();
+    }
+}
+
+void list_type::append(value const& val) {
+    storage.push_back(val);
+}
+
+std::ostream& operator<<(std::ostream& out, list_type const& list) {
+    auto print = [&out](auto const& val) {
+        out << val;
+    };
+    out << '[';
+    for (int i = 0; i < list.storage.size(); ++i) {
+        visit_value(list.storage[i], print);
+        if (i != list.storage.size() - 1) out << ", ";
+    }
+    out << ']';
+    return out;
+}
+
 value::value(value const& rhs) {
     tpe = rhs.tpe;
     memory = rhs.memory;
