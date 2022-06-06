@@ -111,6 +111,16 @@ ps::value value::from(ps::memory_pool& memory, bool v) {
     return val;
 }
 
+ps::value value::from(ps::memory_pool& memory, ps::list_type const& v) {
+    ps::value val {};
+    val.memory = &memory;
+    val.tpe = type::list;
+    val.ptr = memory.allocate<ps::list>();
+    if (val.ptr == ps::null_pointer) throw std::bad_alloc();
+    memory.get<ps::list>(val.ptr) = v;
+    return val;
+}
+
 ps::pointer value::pointer() {
     return ptr;
 }

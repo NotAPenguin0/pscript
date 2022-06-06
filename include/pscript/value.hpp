@@ -263,6 +263,11 @@ class list_type {
 
 };
 
+inline std::ostream& operator<<(std::ostream& out, list_type const& list) {
+    // TODO
+    return out;
+}
+
 using integer = arithmetic_type<int>;
 using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
@@ -287,6 +292,7 @@ public:
     static ps::value from(ps::memory_pool& memory, int v);
     static ps::value from(ps::memory_pool& memory, float v);
     static ps::value from(ps::memory_pool& memory, bool v);
+    static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
 
     ps::pointer pointer();
     type get_type() const;
