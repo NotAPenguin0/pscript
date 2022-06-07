@@ -51,7 +51,7 @@ content <- (comment / element / namespace_decl / function / struct)* { no_ast_op
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '='
+operator <- < '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -161,13 +161,14 @@ compound <- element / (brace_open element* brace_close) { no_ast_opt }
 
 # ================= expressions =================
 
-# There are four kinds of expressions that each need to be parsed differently.
+# There are six kinds of expressions that each need to be parsed differently.
 # - a constructor expression in the form MyType{arguments...}
 # - a list expression in the form [list_elements...]
-# - an 'operator' epxression in the form expression operator expression (ex. a == 8)
+# - an 'operator' epxression in the form 'expression operator expression' (ex. a == 8)
 # - a call expression in the form my_function(arguments...)
 # - an indexing expression x[y]
-expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression
+# - a member access expression x->y
+expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression / access_expression
 
 # ----- constructor epxression -----
 constructor_expression <- identifier space '{' argument_list? '}'
@@ -184,7 +185,7 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (access_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
@@ -194,6 +195,10 @@ argument <- expression
 
 # ----- indexing expression -----
 index_expression <- identifier list_open expression list_close
+
+# ----- member access expression -----
+access_expression <- (identifier arrow)+ identifier space
+
 
 # ================= control sequences =================
 
@@ -312,6 +317,10 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         evaluate_function_definition(node, namespace_prefix);
     }
 
+    if (node_is_type(node, "struct")) {
+        evaluate_struct_definition(node, namespace_prefix);
+    }
+
     if (node_is_type(node, "call_expression")) {
         return evaluate_function_call(node, scope);
     }
@@ -422,6 +431,31 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     it.first->second.name = it.first->first;
 }
 
+void context::evaluate_struct_definition(peg::Ast const* node, std::string const& namespace_prefix) {
+    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    peg::Ast const* members = find_child_with_type(node, "struct_items");
+    struct_description info {};
+
+    if (members) {
+        for (auto const& field : members->nodes) {
+            if (!node_is_type(field.get(), "struct_item")) continue;
+
+            peg::Ast const* name = find_child_with_type(field.get(), "identifier");
+            peg::Ast const* initializer = find_child_with_type(field.get(), "struct_initializer");
+            peg::Ast const* init_expression = find_child_with_type(initializer, "expression");
+            struct_description::member field_info {
+                name->token_to_string(),
+                evaluate_expression(init_expression, nullptr)
+            };
+            info.members.push_back(std::move(field_info));
+        }
+    }
+
+    std::string name = namespace_prefix + identifier->token_to_string();
+    auto it = structs.insert({ name, std::move(info) });
+    it.first->second.name = it.first->first;
+}
+
 static std::string read_script(std::string const& filename) {
     std::ifstream file {filename};
     return std::string { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
@@ -510,6 +544,8 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     // special case for list index expressions
     if (node_is_type(lhs, "index_expression")) {
         value = &index_list(lhs, scope);
+    } else if (node_is_type(lhs, "access_expression")) {
+        value = &access_member(lhs, scope);
     } else {
         std::string tok = lhs->token_to_string();
         ps::variable& var = get_variable(tok, scope);
@@ -656,9 +692,7 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     if (name == "__print") {
         if (arguments.empty()) throw std::runtime_error("[__print()] invalid argument count.");
         ps::value const& to_print = arguments[0];
-        visit_value(to_print, [this](auto const& val) {
-            *exec_ctx.out << val << std::endl;
-        });
+        *exec_ctx.out << to_print << std::endl;
         // success
         return ps::value::from(memory(), 0);
     } else if (name == "__readln") {
@@ -675,6 +709,26 @@ ps::value context::evaluate_list(peg::Ast const* node, block_scope* scope) {
    return ps::value::from(memory(), ps::list_type{ arguments });
 }
 
+ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_scope* scope) {
+    auto arguments = evaluate_argument_list(node, scope);
+    // TODO: add support for builtin types here!
+    peg::Ast const* type = find_child_with_type(node, "identifier");
+    std::string struct_name = type->token_to_string();
+    auto it = structs.find(struct_name);
+    if (it == structs.end()) throw std::runtime_error("Struct '" + struct_name + "' not defined in current scope.");
+    auto const& struct_def = it->second;
+    std::unordered_map<std::string, ps::value> initializers;
+    for (int i = 0; i < arguments.size(); ++i) {
+        initializers.insert({ struct_def.members[i].name, std::move(arguments[i]) });
+    }
+    // add default initializers
+    for (int j = arguments.size(); j < struct_def.members.size(); ++j) {
+        initializers.insert({struct_def.members[j].name, struct_def.members[j].default_value});
+    }
+
+    return ps::value::from(memory(), ps::struct_type { initializers });
+}
+
 ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* index_expr = find_child_with_type(node, "expression");
@@ -686,6 +740,19 @@ ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
 
     ps::value& value = list->get(index.value());
     return value;
+}
+
+ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
+    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    ps::variable& var = get_variable(identifier->token_to_string(), scope);
+    ps::value* cur_val = &var.value();
+    for (auto const& child : node->nodes) {
+        if (child.get() == identifier) continue; // skip initial node
+        if (!node_is_type(child.get(), "identifier")) continue; // only process identifiers
+        auto& as_struct = static_cast<ps::structure&>(*cur_val);
+        cur_val = &as_struct->access(child->token_to_string());
+    }
+    return *cur_val;
 }
 
 ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope) {
@@ -717,12 +784,20 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
         return evaluate_operator(lhs_node, operator_node, rhs_node, scope);
     }
 
+    if (node_is_type(node, "constructor_expression")) {
+        return evaluate_constructor_expression(node, scope);
+    }
+
     if (node_is_type(node, "list_expression")) {
         return evaluate_list(node, scope);
     }
 
     if (node_is_type(node, "index_expression")) {
         return index_list(node, scope);
+    }
+
+    if (node_is_type(node, "access_expression")) {
+        return access_member(node, scope);
     }
 
     return ps::value::null();

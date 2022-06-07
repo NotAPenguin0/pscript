@@ -33,12 +33,9 @@ size_t list_type::size() const {
 
 std::string list_type::to_string() const {
     std::ostringstream out {};
-    auto print = [&out](auto const& val) {
-        out << val;
-    };
     out << '[';
     for (int i = 0; i < storage.size(); ++i) {
-        visit_value(storage[i], print);
+        out << storage[i];
         if (i != storage.size() - 1) out << ", ";
     }
     out << ']';
@@ -70,6 +67,11 @@ void try_push_arg<ps::list_type>(arg_store& dyn, ps::list_type const& value) {
     dyn.push_back(value.to_string());
 }
 
+template<>
+void try_push_arg<ps::struct_type>(arg_store& dyn, ps::struct_type const& value) {
+    dyn.push_back(value.to_string());
+}
+
 static std::string format_vector(std::string_view format, std::vector<ps::value> const& args) {
     arg_store fmt_args {};
 
@@ -96,10 +98,29 @@ float string_type::parse_float() const {
 }
 
 std::ostream& operator<<(std::ostream& out, string_type const& str) {
-    for (char c : str.storage) {
-        out << c;
+    return out << str.storage;
+}
+
+struct_type::struct_type(std::unordered_map<std::string, ps::value> const& initializers) {
+    members = initializers;
+}
+
+std::string struct_type::to_string() const {
+    std::ostringstream oss {};
+    oss << "{\n";
+    for (auto const& [name, value] : members) {
+        oss << '\t' << name << ": " << value << '\n';
     }
-    return out;
+    oss << "}";
+    return oss.str();
+}
+
+ps::value& struct_type::access(std::string const& name) {
+    return members.at(name);
+}
+
+std::ostream& operator<<(std::ostream& out, struct_type const& s) {
+    return out << s.to_string();
 }
 
 value::value(value const& rhs) {
@@ -229,6 +250,16 @@ ps::value value::from(ps::memory_pool& memory, ps::string_type const& v) {
     return val;
 }
 
+ps::value value::from(ps::memory_pool& memory, ps::struct_type const& v) {
+    ps::value val {};
+    val.memory = &memory;
+    val.tpe = type::structure;
+    val.ptr = memory.allocate<ps::structure>();
+    if (val.ptr == ps::null_pointer) throw std::bad_alloc();
+    memory.get<ps::structure>(val.ptr) = v;
+    return val;
+}
+
 ps::pointer value::pointer() {
     return ptr;
 }
@@ -251,6 +282,14 @@ ps::integer const& value::int_value() const {
 
 ps::real const& value::real_value() const {
     return memory->get<ps::real>(ptr);
+}
+
+std::ostream& operator<<(std::ostream& out, value const& v) {
+    auto print = [&out](auto const& val) {
+        out << val;
+    };
+    visit_value(v, print);
+    return out;
 }
 
 }

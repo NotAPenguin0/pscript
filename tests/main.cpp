@@ -490,3 +490,56 @@ TEST_CASE("stdlib") {
         CHECK(ctx.get_variable_value("y").int_value().value() == 4);
     }
 }
+
+TEST_CASE("structs") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    SECTION("declaration") {
+        std::string source = R"(
+            struct MyStruct {
+                a: int = 5;
+                b: float = 6.6;
+            };
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("construction") {
+        std::string source = R"(
+            import std.io;
+
+            struct MyStruct {
+                a: int = 5;
+                b: float = 6.6;
+            };
+
+            let m = MyStruct { 1 };
+            std.io.print(m);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("member access") {
+        std::string source = R"(
+            import std.io;
+
+            struct MyStruct {
+                a: int = 5;
+                b: float = 6.6;
+            };
+
+            let m = MyStruct { 1 };
+            std.io.print(m->a);
+            m->b = 4.0;
+            std.io.print(m->b);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}

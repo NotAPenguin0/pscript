@@ -8,6 +8,7 @@
 #include <exception>
 #include <stdexcept>
 #include <iostream>
+#include <unordered_map>
 
 namespace ps {
 
@@ -21,6 +22,7 @@ enum class type {
     boolean,
     str,
     list,
+    structure,
     // external functions or classes.
     external_object
 };
@@ -317,11 +319,31 @@ private:
     std::string storage {};
 };
 
+class struct_type {
+public:
+    struct_type() = default;
+    explicit struct_type(std::unordered_map<std::string, ps::value> const& initializers);
+    struct_type(struct_type const&) = default;
+    struct_type(struct_type&&) noexcept = default;
+    struct_type& operator=(struct_type const&) = default;
+    struct_type& operator=(struct_type&&) noexcept = default;
+
+    std::string to_string() const;
+
+    ps::value& access(std::string const& name);
+
+    friend std::ostream& operator<<(std::ostream& out, string_type const& str);
+
+private:
+    std::unordered_map<std::string, ps::value> members;
+};
+
 using integer = arithmetic_type<int>;
 using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
 using str = value_storage<string_type>;
+using structure = value_storage<struct_type>;
 
 // string concatenation
 inline string_type operator+(str const& lhs, str const& rhs) {
@@ -349,6 +371,7 @@ public:
     static ps::value from(ps::memory_pool& memory, bool v);
     static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
     static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::struct_type const& v);
 
     ps::pointer pointer();
     type get_type() const;
@@ -374,6 +397,8 @@ public:
     inline ps::memory_pool& get_memory() const {
         return *memory;
     }
+
+    friend std::ostream& operator<<(std::ostream& out, value const& v);
 
 private:
     value() = default;
@@ -405,6 +430,9 @@ void visit_value(value& v, F&& callable) {
         case type::list:
             callable(static_cast<ps::list&>(v));
             break;
+        case type::structure:
+            callable(static_cast<ps::structure&>(v));
+            break;
         case type::external_object:
             break;
         default:
@@ -431,6 +459,9 @@ void visit_value(value const& v, F&& callable) {
             break;
         case type::list:
             callable(static_cast<ps::list const&>(v));
+            break;
+        case type::structure:
+            callable(static_cast<ps::structure const&>(v));
             break;
         case type::external_object:
             break;

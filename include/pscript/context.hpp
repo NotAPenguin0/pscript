@@ -94,11 +94,23 @@ private:
         peg::Ast const* node = nullptr;
 
         struct parameter {
-            std::string name = "";
+            std::string name {};
             ps::type type {};
         };
         // parameters this function was declared with
         std::vector<parameter> params;
+    };
+
+    struct struct_description {
+        // refers to key in map
+        std::string_view name;
+
+        struct member {
+            std::string name;
+            ps::value default_value;
+        };
+
+        std::vector<member> members;
     };
 
     struct function_call {
@@ -110,11 +122,11 @@ private:
     ps::memory_pool mem;
     std::unordered_map<std::string, ps::variable> global_variables;
     std::unordered_map<std::string, function> functions;
+    std::unordered_map<std::string, struct_description> structs;
     std::vector<ps::script> imported_scripts {}; // we need to keep these around so the ast nodes stay valid.
     ps::execution_context exec_ctx;
 
     std::stack<function_call> call_stack {};
-
 
     std::unique_ptr<peg::parser> ast_parser;
 
@@ -129,6 +141,7 @@ private:
 
     void evaluate_declaration(peg::Ast const* node, block_scope* scope);
     void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
+    void evaluate_struct_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
 
     void evaluate_import(peg::Ast const* node);
 
@@ -146,10 +159,12 @@ private:
 
     // return reference to list value, given index-expr node.
     ps::value& index_list(peg::Ast const* node, block_scope* scope);
+    ps::value& access_member(peg::Ast const* node, block_scope* scope);
 
     ps::value evaluate_operand(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope);
     ps::value evaluate_expression(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
 };
 
