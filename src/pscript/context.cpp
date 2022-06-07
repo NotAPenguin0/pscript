@@ -68,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_+*/=?!(){} ]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -121,7 +121,7 @@ builtin_function <- '__print' / '__readln'
 #   b: int = 0;
 # };
 struct <- 'struct ' identifier space brace_open struct_items brace_close semicolon
-struct_items <- (struct_item semicolon)*
+struct_items <- ((struct_item semicolon) / comment)*
 struct_item <- identifier colon typename struct_initializer?
 struct_initializer <- assign expression
 
@@ -768,6 +768,14 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
         for (auto const& child : node->nodes) {
             if (node_is_type(child.get(), "expression")) {
                 return evaluate_expression(child.get(), scope);
+            }
+
+            if (node_is_type(child.get(), "unary_operator")) {
+                peg::Ast const* operand = find_child_with_type(node, "operand");
+                std::string op = child->token_to_string();
+                if (op == "-") {
+                    return -evaluate_expression(operand, scope);
+                }
             }
         }
     }

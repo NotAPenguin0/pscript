@@ -1,6 +1,7 @@
 #include <pscript/context.hpp>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 #include <pscript/tokenizer.hpp>
 
@@ -517,7 +518,7 @@ TEST_CASE("structs") {
             };
 
             let m = MyStruct { 1 };
-            std.io.print(m);
+            // std.io.print(m);
         )";
 
         ps::script script(source, ctx);
@@ -534,12 +535,23 @@ TEST_CASE("structs") {
             };
 
             let m = MyStruct { 1 };
-            std.io.print(m->a);
+            // std.io.print(m->a);
             m->b = 4.0;
-            std.io.print(m->b);
+            // std.io.print(m->b);
         )";
 
         ps::script script(source, ctx);
         ctx.execute(script);
     }
+}
+
+TEST_CASE("perceptron") {
+    constexpr size_t memsize = 1024 * 1024;
+    ps::context ctx(memsize);
+
+    std::ifstream infile {"samples/perceptron.ps"};
+    std::string source = std::string{std::istreambuf_iterator<char>(infile), {}};
+
+    ps::script script(source, ctx);
+    ctx.execute(script);
 }

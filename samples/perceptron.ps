@@ -1,0 +1,26 @@
+import std.io;
+
+struct AIState {
+    weights: list = [];
+    bias: int = 0;
+    learning_rate: float = 0.0;
+};
+
+struct Sample {
+    // input vector for this sample
+    input: list = [];
+    // desired output for this sample.
+    output: float = 0.0;
+};
+
+// This will create samples trying to make the perceptron classify points with y < 0 as 0, and y > 0 as 1.
+fn obtain_training_samples() -> list {
+    return [Sample {[0.2, -1.0], 0.0}, Sample {[0.4, 1.0], 1.0}, Sample {[-3.0, -0.5], 0.0}, Sample{[2.0, 0.0], 0.5}, Sample{[-10.0, 0.3], 1.0}];
+}
+
+std.io.print("pscript sample program, simple single layer perceptron");
+
+let state = AIState { [], 0, 0.2 };
+let training = obtain_training_samples();
+
+std.io.print(training);

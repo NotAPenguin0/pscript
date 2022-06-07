@@ -152,6 +152,11 @@ T operator-(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator- not supported for this type");
 }
 
+template<typename T>
+T operator-(value_storage<T> const& lhs) {
+    throw std::runtime_error("unary operator- not supported for this type");
+}
+
 template<typename T, typename U>
 T operator*(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator* not supported for this type");
@@ -249,6 +254,12 @@ std::common_type_t<T, U> operator-(arithmetic_type<T> const& lhs, U const& rhs) 
     return lhs.value() - rhs;
 }
 
+template<typename T>
+T operator-(arithmetic_type<T> const& lhs) {
+    // unary operator-
+    return -lhs.value();
+}
+
 template<typename T, typename U> requires plib::multiplies<T, U>
 std::common_type_t<T, U> operator*(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
     return lhs.value() * rhs.value();
@@ -342,7 +353,7 @@ using integer = arithmetic_type<int>;
 using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
-using str = value_storage<string_type>;
+using str = eq_comparable<string_type>;
 using structure = value_storage<struct_type>;
 
 // string concatenation
@@ -485,6 +496,14 @@ void visit_value(value const& v, F&& callable) {
         });                                                                                       \
     });                                                                                           \
     return lhs;                                                                                   \
+}
+
+inline ps::value operator-(ps::value const& lhs) {
+    ps::value result = ps::value::null();
+    visit_value(lhs, [&lhs, &result](auto const& lhs_val) {
+        result = value::from(lhs.get_memory(), -lhs_val);
+    });
+    return result;
 }
 
 GEN_VALUE_OP(+)

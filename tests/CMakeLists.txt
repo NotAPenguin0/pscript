@@ -21,3 +21,12 @@ add_custom_command(
         COMMENT "Copying plib modules - tests"
         VERBATIM
 )
+
+file(GLOB_RECURSE SAMPLES "../samples/*")
+add_custom_command(
+        TARGET plib-test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../samples/" ${CMAKE_CURRENT_BINARY_DIR}/samples
+        DEPENDS ${SAMPLES}
+        COMMENT "Copying plib samples - tests"
+        VERBATIM
+)
