@@ -12,8 +12,6 @@ namespace ps {
 
 // Not too proud of this one, but moving to an external file is also not optimal
 static const char* grammar = R"(
-# ================= control sequences =================
-
 # --------------------------------
 # Explanation of basic PEG syntax:
 # --------------------------------
@@ -70,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_-+-*/=?!() ]*
+any <- [a-zA-Z0-9.,:;_-+-*/=?!(){} ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -83,7 +81,7 @@ literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9] >
-string <- < quote [a-z]* quote >
+string <- < quote any quote >
 boolean <- < 'true' / 'false' >
 
 # ================= typenames =================
@@ -591,6 +589,8 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
             ps::type const type = var->value().get_type();
             if (type == ps::type::list) {
                 return evaluate_list_member_function(func_name, *var, node, scope);
+            } else if (type == ps::type::str) {
+                return evaluate_string_member_function(func_name, *var, node, scope);
             }
         } else { // this is a regular function call, still make sure to set lookup name properly
             func_name = namespace_name + '.' + func_name;
@@ -623,6 +623,18 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
 
     if (name == "size") {
         return ps::value::from(memory(), (int)static_cast<ps::list&>(val)->size());
+    }
+
+    return ps::value::null();
+}
+
+ps::value context::evaluate_string_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
+    auto arguments = evaluate_argument_list(node, scope);
+
+    ps::value& val = object.value();
+    if (name == "format") {
+        auto const& str = static_cast<ps::str const&>(val);
+        return str->format(memory(), arguments);
     }
 
     return ps::value::null();

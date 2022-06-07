@@ -137,6 +137,7 @@ private:
     ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_string_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
 
     // return reference to list value, given index-expr node.
     ps::value& index_list(peg::Ast const* node, block_scope* scope);

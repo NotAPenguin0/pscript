@@ -1,5 +1,3 @@
-# ================= control sequences =================
-
 # --------------------------------
 # Explanation of basic PEG syntax:
 # --------------------------------
@@ -56,7 +54,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_-+-*/=?!() ]*
+any <- [a-zA-Z0-9.,:;_-+-*/=?!(){} ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -69,7 +67,7 @@ literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9] >
-string <- < quote [a-z]* quote >
+string <- < quote any quote >
 boolean <- < 'true' / 'false' >
 
 # ================= typenames =================

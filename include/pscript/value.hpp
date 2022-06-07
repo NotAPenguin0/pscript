@@ -283,7 +283,11 @@ public:
     ps::value& get(size_t index);
     size_t size() const;
 
+    std::string to_string() const;
+
     friend std::ostream& operator<<(std::ostream& out, list_type const& list);
+
+    inline std::vector<ps::value> const& representation() const { return storage; }
 
 private:
     std::vector<ps::value> storage;
@@ -300,7 +304,11 @@ public:
     string_type& operator=(string_type const&) = default;
     string_type& operator=(string_type&&) noexcept = default;
 
+    ps::value format(ps::memory_pool& memory, std::vector<ps::value> const& args) const;
+
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
+
+    inline std::string const& representation() const { return storage; }
 
 private:
     std::string storage {};
@@ -311,6 +319,11 @@ using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
 using str = value_storage<string_type>;
+
+// string concatenation
+inline string_type operator+(str const& lhs, str const& rhs) {
+    return string_type { lhs->representation() + rhs->representation() };
+}
 
 /**
  * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).

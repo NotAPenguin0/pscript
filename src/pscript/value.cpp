@@ -1,6 +1,11 @@
 #include <pscript/value.hpp>
 
 #include <iostream>
+#include <cstdarg>
+#include <sstream>
+
+#include <fmt/format.h>
+#include <fmt/args.h>
 
 namespace ps {
 
@@ -26,21 +31,60 @@ size_t list_type::size() const {
     return storage.size();
 }
 
-std::ostream& operator<<(std::ostream& out, list_type const& list) {
+std::string list_type::to_string() const {
+    std::ostringstream out {};
     auto print = [&out](auto const& val) {
         out << val;
     };
     out << '[';
-    for (int i = 0; i < list.storage.size(); ++i) {
-        visit_value(list.storage[i], print);
-        if (i != list.storage.size() - 1) out << ", ";
+    for (int i = 0; i < storage.size(); ++i) {
+        visit_value(storage[i], print);
+        if (i != storage.size() - 1) out << ", ";
     }
     out << ']';
-    return out;
+    return out.str();
+}
+
+std::ostream& operator<<(std::ostream& out, list_type const& list) {
+    return out << list.to_string();
 }
 
 string_type::string_type(std::string const& str) {
     storage = str;
+}
+
+using arg_store = fmt::dynamic_format_arg_store<fmt::format_context>;
+
+template<typename T>
+static void try_push_arg(arg_store& dyn, T const& value) {
+    dyn.push_back(value);
+}
+
+template<>
+void try_push_arg<ps::string_type>(arg_store& dyn, ps::string_type const& value) {
+    dyn.push_back(value.representation());
+}
+
+template<>
+void try_push_arg<ps::list_type>(arg_store& dyn, ps::list_type const& value) {
+    dyn.push_back(value.to_string());
+}
+
+static std::string format_vector(std::string_view format, std::vector<ps::value> const& args) {
+    arg_store fmt_args {};
+
+    for (auto const& a : args) {
+        visit_value(a, [&fmt_args](auto const& v) {
+            try_push_arg(fmt_args, v.value());
+        });
+    }
+
+    return fmt::vformat(format, fmt_args);
+}
+
+
+ps::value string_type::format(ps::memory_pool& memory, std::vector<ps::value> const& args) const {
+    return ps::value::from(memory, ps::string_type { format_vector(storage, args) });
 }
 
 std::ostream& operator<<(std::ostream& out, string_type const& str) {

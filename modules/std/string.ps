@@ -1,0 +1,14 @@
+// formats a string with a list of arguments.
+// max amount of arguments is 8
+// on error, returns an empty string.
+fn format(fmt_str: str, fmt_args: list) -> str {
+    if (fmt_args.size() > 8) return "";
+    if (fmt_args.size() == 1) return fmt_str.format(fmt_args[0]);
+    if (fmt_args.size() == 2) return fmt_str.format(fmt_args[0], fmt_args[1]);
+    if (fmt_args.size() == 3) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2]);
+    if (fmt_args.size() == 4) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2], fmt_args[3]);
+    if (fmt_args.size() == 5) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2], fmt_args[3], fmt_args[4]);
+    if (fmt_args.size() == 6) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2], fmt_args[3], fmt_args[4], fmt_args[5]);
+    if (fmt_args.size() == 7) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2], fmt_args[3], fmt_args[4], fmt_args[5], fmt_args[6]);
+    if (fmt_args.size() == 8) return fmt_str.format(fmt_args[0], fmt_args[1], fmt_args[2], fmt_args[3], fmt_args[4], fmt_args[5], fmt_args[6], fmt_args[7]);
+}

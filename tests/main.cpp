@@ -361,9 +361,28 @@ TEST_CASE("strings") {
         ctx.execute(script);
     }
 
+    SECTION("concatenation") {
+        std::string source = R"(
+            import std.io;
+
+            let x = "ABC";
+            let y = "DEF";
+            std.io.print(x + y);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
     SECTION("formatting") {
         std::string source = R"(
+            import std.io;
+            import std.string;
+            std.io.print(std.string.format("Hello, {}", ["pengu"]));
 
+            let my_list = [1, 2, 3];
+            let fmt = "list = {}";
+            std.io.print(fmt.format(my_list));
         )";
 
         ps::script script(source, ctx);
@@ -397,11 +416,12 @@ TEST_CASE("stdlib") {
 
             let x = std.math.min(3, 4);
             let y = std.math.max(3, 4);
-            std.io.print(x);
-            std.io.print(y);
         )";
 
         ps::script script(source, ctx);
         ctx.execute(script);
+
+        CHECK(ctx.get_variable_value("x").int_value().value() == 3);
+        CHECK(ctx.get_variable_value("y").int_value().value() == 4);
     }
 }

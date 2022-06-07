@@ -26,6 +26,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(peglib)
 
+FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt
+)
+FetchContent_MakeAvailable(fmt)
+
 # TODO: Add option to exclude pscript
 
 add_library(plib STATIC)
@@ -39,6 +45,9 @@ target_sources(plib PRIVATE
         src/pscript/lexer.cpp
 )
 target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
+
+target_link_libraries(plib PUBLIC fmt)
+target_include_directories(plib PRIVATE ${fmt_SOURCE_DIR}/include)
 
 target_compile_options(plib PRIVATE "-Wno-format")
 
