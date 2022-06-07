@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include <pscript/tokenizer.hpp>
-#include <peglib.h> // usually not necessary, but we add this here so we can print the AST as a debug operation.
 
 std::ostream& operator<<(std::ostream& out, ps::token_type const& type) {
 #define gen(name) if (type == ps::token_type:: name) return out << #name ;
@@ -346,6 +345,32 @@ TEST_CASE("lists") {
     }
 }
 
+TEST_CASE("strings") {
+    constexpr std::size_t memsize = 4096;
+    ps::context ctx(memsize);
+
+    SECTION("basics") {
+        std::string source = R"(
+            import std.io;
+
+            let my_str = "foobar";
+            std.io.print(my_str);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("formatting") {
+        std::string source = R"(
+
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}
+
 TEST_CASE("modules") {
     constexpr std::size_t memsize = 512;
     ps::context ctx(memsize);
@@ -354,6 +379,26 @@ TEST_CASE("modules") {
         std::string source = R"(
             import std.io;
             std.io.print(5);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}
+
+TEST_CASE("stdlib") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    SECTION("math") {
+        std::string source = R"(
+            import std.math;
+            import std.io;
+
+            let x = std.math.min(3, 4);
+            let y = std.math.max(3, 4);
+            std.io.print(x);
+            std.io.print(y);
         )";
 
         ps::script script(source, ctx);

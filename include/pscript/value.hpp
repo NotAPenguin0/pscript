@@ -267,6 +267,8 @@ std::common_type_t<T, U> operator/(arithmetic_type<T> const& lhs, U const& rhs) 
     return lhs.value() / rhs;
 }
 
+// TODO: replace stored vector and string by custom types that use our memory allocator
+
 class list_type {
 public:
     list_type() = default;
@@ -288,10 +290,27 @@ private:
     type stored_type {};
 };
 
+class string_type {
+public:
+    string_type() = default;
+
+    explicit string_type(std::string const& str);
+    string_type(string_type const&) = default;
+    string_type(string_type&&) noexcept = default;
+    string_type& operator=(string_type const&) = default;
+    string_type& operator=(string_type&&) noexcept = default;
+
+    friend std::ostream& operator<<(std::ostream& out, string_type const& str);
+
+private:
+    std::string storage {};
+};
+
 using integer = arithmetic_type<int>;
 using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
+using str = value_storage<string_type>;
 
 /**
  * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).
@@ -313,6 +332,7 @@ public:
     static ps::value from(ps::memory_pool& memory, float v);
     static ps::value from(ps::memory_pool& memory, bool v);
     static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
 
     ps::pointer pointer();
     type get_type() const;
@@ -364,6 +384,7 @@ void visit_value(value& v, F&& callable) {
             callable(static_cast<ps::boolean&>(v));
             break;
         case type::str:
+            callable(static_cast<ps::str&>(v));
             break;
         case type::list:
             callable(static_cast<ps::list&>(v));
@@ -390,6 +411,7 @@ void visit_value(value const& v, F&& callable) {
             callable(static_cast<ps::boolean const&>(v));
             break;
         case type::str:
+            callable(static_cast<ps::str const&>(v));
             break;
         case type::list:
             callable(static_cast<ps::list const&>(v));

@@ -39,13 +39,24 @@ std::ostream& operator<<(std::ostream& out, list_type const& list) {
     return out;
 }
 
+string_type::string_type(std::string const& str) {
+    storage = str;
+}
+
+std::ostream& operator<<(std::ostream& out, string_type const& str) {
+    for (char c : str.storage) {
+        out << c;
+    }
+    return out;
+}
+
 value::value(value const& rhs) {
     tpe = rhs.tpe;
     memory = rhs.memory;
 
     if (!is_null()) {
         visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
-            ptr = memory->allocate(sizeof(T));
+            ptr = memory->allocate<T>();
             if (ptr == ps::null_pointer) throw std::bad_alloc();
             static_cast<T&>(*this) = rhs_val;
         });
@@ -67,7 +78,7 @@ value& value::operator=(value const& rhs) {
         memory = rhs.memory;
         if (!is_null()) {
             visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
-                ptr = memory->allocate(sizeof(T));
+                ptr = memory->allocate<T>();
                 if (ptr == ps::null_pointer) throw std::bad_alloc();
                 static_cast<T&>(*this) = rhs_val;
             });
@@ -153,6 +164,16 @@ ps::value value::from(ps::memory_pool& memory, ps::list_type const& v) {
     val.ptr = memory.allocate<ps::list>();
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::list>(val.ptr) = v;
+    return val;
+}
+
+ps::value value::from(ps::memory_pool& memory, ps::string_type const& v) {
+    ps::value val {};
+    val.memory = &memory;
+    val.tpe = type::str;
+    val.ptr = memory.allocate<ps::str>();
+    if (val.ptr == ps::null_pointer) throw std::bad_alloc();
+    memory.get<ps::str>(val.ptr) = v;
     return val;
 }
 

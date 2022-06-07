@@ -40,6 +40,8 @@ target_sources(plib PRIVATE
 )
 target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
 
+target_compile_options(plib PRIVATE "-Wno-format")
+
 # copy over modules to build directory
 file(GLOB_RECURSE MODULE_FILES "modules/*")
 add_custom_command(

@@ -9,6 +9,8 @@
 #include <optional>
 #include <stack>
 
+#include <peglib.h>
+
 namespace peg {
     class parser;
 }

@@ -475,7 +475,12 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
 
     // string literal
     if (str_repr[0] == '\"') {
-        throw std::runtime_error("[operand] string literals not yet implemented");
+        if (str_repr.size() > 2) {
+            return ps::value::from(memory(), ps::str::value_type { str_repr.substr(1, str_repr.length() - 2) });
+        } else {
+            // empty string
+            return ps::value::from(memory(), ps::str::value_type {});
+        }
     }
 
     // identifier
