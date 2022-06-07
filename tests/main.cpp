@@ -85,6 +85,11 @@ private:
     std::vector<ps::token_type> const& tokens;
 };
 
+// requires that output stream is a stringstream
+static bool output_equal(ps::execution_context& exec, std::string const& expected) {
+    return dynamic_cast<std::ostringstream*>(exec.out)->str() == expected;
+}
+
 TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
     constexpr std::size_t memsize = 1024 * 1024;
@@ -197,13 +202,19 @@ TEST_CASE("script", "[script]") {
     constexpr std::size_t memsize = 128;
     ps::context ctx(memsize);
 
+    std::ostringstream out {};
+    ps::execution_context exec {};
+    exec.out = &out;
+
     SECTION("builtins") {
         std::string source = R"(
             __print(5 + 6);
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "11\n"));
     }
 
     SECTION("simple functions") {
@@ -222,7 +233,9 @@ TEST_CASE("script", "[script]") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "300\n"));
     }
 
     SECTION("local scopes") {
@@ -247,6 +260,10 @@ TEST_CASE("control sequences", "[script]") {
     constexpr std::size_t memsize = 512;
     ps::context ctx(memsize);
 
+    std::ostringstream out {};
+    ps::execution_context exec {};
+    exec.out = &out;
+
     SECTION("if") {
         std::string source = R"(
             fn print(x: int) -> int {
@@ -265,7 +282,9 @@ TEST_CASE("control sequences", "[script]") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "5\n"));
     }
 
     SECTION("recursion") {
@@ -310,6 +329,10 @@ TEST_CASE("lists") {
     constexpr std::size_t memsize = 512;
     ps::context ctx(memsize);
 
+    std::ostringstream out {};
+    ps::execution_context exec {};
+    exec.out = &out;
+
     SECTION("append") {
         std::string source = R"(
             let my_list = [1, 2, 3];
@@ -320,7 +343,9 @@ TEST_CASE("lists") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "[1, 2, 3, 4, 5, 6.6]\n"));
     }
 
     SECTION("indexing") {
@@ -331,7 +356,9 @@ TEST_CASE("lists") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "10\n"));
     }
 
     SECTION("size query") {
@@ -341,13 +368,20 @@ TEST_CASE("lists") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+        CHECK(output_equal(exec, "3\n"));
     }
 }
 
 TEST_CASE("strings") {
     constexpr std::size_t memsize = 4096;
     ps::context ctx(memsize);
+
+    std::ostringstream out {};
+    std::istringstream in {"10\n20\n"};
+    ps::execution_context exec {};
+    exec.out = &out;
+    exec.in = &in;
 
     SECTION("basics") {
         std::string source = R"(
@@ -358,7 +392,9 @@ TEST_CASE("strings") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "foobar\n"));
     }
 
     SECTION("concatenation") {
@@ -371,7 +407,9 @@ TEST_CASE("strings") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "ABCDEF\n"));
     }
 
     SECTION("formatting") {
@@ -386,13 +424,38 @@ TEST_CASE("strings") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "Hello, pengu\nlist = [1, 2, 3]\n"));
+    }
+
+
+    SECTION("input") {
+        std::string source = R"(
+            import std.io;
+
+            std.io.print("Enter first value: ");
+            let x = std.io.read_int();
+            std.io.print("Enter second value: ");
+            let y = std.io.read_int();
+            let fmt = "{} + {} = {}";
+            std.io.print(fmt.format(x, y, x + y));
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "Enter first value: \nEnter second value: \n10 + 20 = 30\n"));
     }
 }
 
 TEST_CASE("modules") {
     constexpr std::size_t memsize = 512;
     ps::context ctx(memsize);
+
+    std::ostringstream out {};
+    ps::execution_context exec {};
+    exec.out = &out;
 
     SECTION("std import") {
         std::string source = R"(
@@ -401,7 +464,9 @@ TEST_CASE("modules") {
         )";
 
         ps::script script(source, ctx);
-        ctx.execute(script);
+        ctx.execute(script, exec);
+
+        CHECK(output_equal(exec, "5\n"));
     }
 }
 

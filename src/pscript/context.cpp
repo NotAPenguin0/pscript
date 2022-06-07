@@ -68,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_-+-*/=?!(){} ]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){} ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -112,7 +112,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print'
+builtin_function <- '__print' / '__readln'
 
 # ================= structs =================
 
@@ -296,8 +296,9 @@ ps::value& context::get_variable_value(std::string const& name, block_scope* sco
 }
 
 
-void context::execute(ps::script const& script) {
+void context::execute(ps::script const& script, ps::execution_context exec) {
     std::shared_ptr<peg::Ast> const& ast = script.ast();
+    exec_ctx = exec;
     execute(ast.get(), nullptr); // start execution in global scope
 }
 
@@ -632,9 +633,17 @@ ps::value context::evaluate_string_member_function(std::string_view name, ps::va
     auto arguments = evaluate_argument_list(node, scope);
 
     ps::value& val = object.value();
+    auto const& str = static_cast<ps::str const&>(val);
     if (name == "format") {
-        auto const& str = static_cast<ps::str const&>(val);
-        return str->format(memory(), arguments);
+        return ps::value::from(memory(), str->format(arguments));
+    }
+
+    if (name == "parse_int") {
+        return ps::value::from(memory(), str->parse_int());
+    }
+
+    if (name == "parse_float") {
+        return ps::value::from(memory(), str->parse_float());
     }
 
     return ps::value::null();
@@ -647,11 +656,15 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     if (name == "__print") {
         if (arguments.empty()) throw std::runtime_error("[__print()] invalid argument count.");
         ps::value const& to_print = arguments[0];
-        visit_value(to_print, [](auto const& val) {
-            std::cout << val << std::endl;
+        visit_value(to_print, [this](auto const& val) {
+            *exec_ctx.out << val << std::endl;
         });
         // success
         return ps::value::from(memory(), 0);
+    } else if (name == "__readln") {
+        std::string input {};
+        std::getline(*exec_ctx.in, input);
+        return ps::value::from(memory(), string_type { input });
     }
 
     return ps::value::null();

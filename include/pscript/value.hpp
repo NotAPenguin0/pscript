@@ -304,7 +304,10 @@ public:
     string_type& operator=(string_type const&) = default;
     string_type& operator=(string_type&&) noexcept = default;
 
-    ps::value format(ps::memory_pool& memory, std::vector<ps::value> const& args) const;
+    [[nodiscard]] string_type format(std::vector<ps::value> const& args) const;
+
+    int parse_int() const;
+    float parse_float() const;
 
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 

@@ -2,6 +2,12 @@ fn print(x: any) -> void {
     __print(x);
 }
 
-fn read() -> str {
+// reads a full line of input
+fn readln() -> str {
+    return __readln();
+}
 
+fn read_int() -> int {
+    let s = std.io.readln();
+    return s.parse_int();
 }

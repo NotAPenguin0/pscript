@@ -83,8 +83,16 @@ static std::string format_vector(std::string_view format, std::vector<ps::value>
 }
 
 
-ps::value string_type::format(ps::memory_pool& memory, std::vector<ps::value> const& args) const {
-    return ps::value::from(memory, ps::string_type { format_vector(storage, args) });
+string_type string_type::format(std::vector<ps::value> const& args) const {
+    return ps::string_type { format_vector(storage, args) };
+}
+
+int string_type::parse_int() const {
+    return std::stoi(storage);
+}
+
+float string_type::parse_float() const {
+    return std::stof(storage);
 }
 
 std::ostream& operator<<(std::ostream& out, string_type const& str) {

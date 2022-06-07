@@ -17,7 +17,10 @@ namespace peg {
 
 namespace ps {
 
-// TODO: attach output stream to context instead of hardcoding output to stdout.
+struct execution_context {
+    std::istream* in = &std::cin;
+    std::ostream* out = &std::cout;
+};
 
 /**
  * @brief Core context class for pscript
@@ -82,7 +85,7 @@ public:
      * @brief Executes a script in this context.
      * @param script Script object to execute.
      */
-    void execute(ps::script const& script);
+    void execute(ps::script const& script, ps::execution_context exec = {});
 
 private:
     struct function {
@@ -108,8 +111,10 @@ private:
     std::unordered_map<std::string, ps::variable> global_variables;
     std::unordered_map<std::string, function> functions;
     std::vector<ps::script> imported_scripts {}; // we need to keep these around so the ast nodes stay valid.
+    ps::execution_context exec_ctx;
 
     std::stack<function_call> call_stack {};
+
 
     std::unique_ptr<peg::parser> ast_parser;
 

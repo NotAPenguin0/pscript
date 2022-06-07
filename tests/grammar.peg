@@ -54,7 +54,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_-+-*/=?!(){} ]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){} ]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -98,7 +98,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print'
+builtin_function <- '__print' / '__readln'
 
 # ================= structs =================
 
