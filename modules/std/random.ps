@@ -1,0 +1,41 @@
+import std.time;
+import std.io;
+
+struct RandomState {
+    seed: uint = 0;
+};
+
+fn tea(val0: uint, val1: uint) -> uint {
+    let v0 = val0;
+    let v1 = val1;
+    let s0 = uint { 0 };
+
+    for(let n = 0; n < 16; n += 1) {
+        s0 += uint { 2654435769 };
+        // TODO: literal suffixes!
+        v0 += ((v1 << uint { 4 }) + uint { 2738958700 }) ^ (v1 + s0) ^ ((v1 >> uint { 5 }) + uint { 3355524772 });
+        v1 += ((v0 << uint { 4 }) + uint { 2911926141 }) ^ (v0 + s0) ^ ((v0 >> uint { 5 }) + uint { 2123724318 });
+    }
+
+    return v0;
+}
+
+fn lcg(state: RandomState) -> uint {
+    let LCG_A = uint { 1664525 };
+    let LCG_C = uint { 1013904223 };
+    state->seed = (LCG_A * state->seed + LCG_C);
+    return state->seed & uint { -1 };
+}
+
+fn rand_uint(state: RandomState) -> uint {
+    return std.random.lcg(state);
+}
+
+fn rand(state: RandomState, min: uint, max: uint) -> uint {
+    let n = std.random.rand_uint(state);
+    return (n % (max - min)) + min;
+}
+
+fn init_rand() -> RandomState {
+    return std.random.RandomState { uint { std.time.time() } };
+}

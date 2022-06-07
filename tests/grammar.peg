@@ -37,7 +37,7 @@ content <- (comment / element / namespace_decl / function / struct)* { no_ast_op
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- < '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
+operator <- <  '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -66,18 +66,18 @@ identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
-float <- < [0-9]+.[0-9] >
+float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
 boolean <- < 'true' / 'false' >
 
 # ================= typenames =================
 
-typename <- builtin_type / namespace_list? identifier
+typename <- builtin_type / namespace_list? identifier { no_ast_opt }
 # typenames can be prefixed by namespace qualifiers
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
 # match builtin types separately for easier interpreting
-builtin_type <- 'int' / 'float' / 'str' / 'list' / 'any'
+builtin_type <- 'uint' / 'int' / 'float' / 'str' / 'list' / 'any'
 
 # ================= namespaces =================
 
@@ -98,7 +98,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print' / '__readln'
+builtin_function <- '__print' / '__readln' / '__time'
 
 # ================= structs =================
 
@@ -157,7 +157,7 @@ compound <- element / (brace_open element* brace_close) { no_ast_opt }
 expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression / access_expression
 
 # ----- constructor epxression -----
-constructor_expression <- identifier space '{' argument_list? '}'
+constructor_expression <- typename space '{' argument_list? '}'
 
 # ----- list expression -----
 list_expression <- list_open argument_list? list_close
@@ -167,11 +167,11 @@ op_expression <- atom (operator atom)* {
     precedence
     L = += -= *= /=
     L == != <= >= < >
-    L - +
+    L - + << >> ^ & %
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (access_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (access_expression / constructor_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----

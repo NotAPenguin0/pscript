@@ -123,33 +123,42 @@ std::ostream& operator<<(std::ostream& out, struct_type const& s) {
     return out << s.to_string();
 }
 
+static bool is_reference_type(ps::type type) {
+    if (type == ps::type::list || type == ps::type::str || type == ps::type::structure) return true;
+    else return false;
+}
+
 value::value(value const& rhs) {
     tpe = rhs.tpe;
     memory = rhs.memory;
 
     if (!is_null()) {
-        visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
-            ptr = memory->allocate<T>();
-            if (ptr == ps::null_pointer) throw std::bad_alloc();
-            static_cast<T&>(*this) = rhs_val;
-        });
+        if (is_reference_type(tpe)) {
+            ptr = rhs.ptr;
+            refcount = rhs.refcount;
+            (*refcount)++;
+        } else {
+            visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
+                ptr = memory->allocate<T>();
+                if (ptr == ps::null_pointer) throw std::bad_alloc();
+                static_cast<T&>(*this) = rhs_val;
+            });
+        }
     }
 }
 
 value& value::operator=(value const& rhs) {
     if (&rhs != this) {
         // destroy old value
-        if (ptr != ps::null_pointer) {
-            // call object destructor
-            visit_value(*this,[this] <typename T> (T& val) {
-                val.~T();
-            });
-            memory->free(ptr);
-        }
+        on_destroy();
 
         tpe = rhs.tpe;
         memory = rhs.memory;
-        if (!is_null()) {
+        if (is_reference_type(tpe)) {
+            ptr = rhs.ptr;
+            refcount = rhs.refcount;
+            (*refcount)++;
+        } else {
             visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
                 ptr = memory->allocate<T>();
                 if (ptr == ps::null_pointer) throw std::bad_alloc();
@@ -165,32 +174,53 @@ value::value(ps::value&& rhs)  noexcept {
         ptr = rhs.ptr;
         tpe = rhs.tpe;
         memory = rhs.memory;
+        refcount = rhs.refcount;
         rhs.ptr = ps::null_pointer;
         rhs.tpe = {};
         rhs.memory = nullptr;
+        rhs.refcount = nullptr;
     }
 }
 
 ps::value& value::operator=(ps::value&& rhs)  noexcept {
     if (&rhs != this) {
+        on_destroy();
+
         ptr = rhs.ptr;
         tpe = rhs.tpe;
         memory = rhs.memory;
+        refcount = rhs.refcount;
         rhs.ptr = ps::null_pointer;
         rhs.tpe = {};
         rhs.memory = nullptr;
+        rhs.refcount = nullptr;
     }
     return *this;
 }
 
-value::~value() {
+void value::on_destroy() {
     if (ptr != ps::null_pointer) {
         // call object destructor
-        visit_value(*this,[this] <typename T> (T& val) {
-            val.~T();
-        });
-        memory->free(ptr);
+        if (is_reference_type(tpe)) {
+            (*refcount)--;
+            if (*refcount == 0) {
+                visit_value(*this,[] <typename T> (T& val) {
+                    val.~T();
+                });
+                memory->free(ptr);
+            }
+        }
+        else {
+            visit_value(*this, []<typename T>(T& val) {
+                val.~T();
+            });
+            memory->free(ptr);
+        }
     }
+}
+
+value::~value() {
+    on_destroy();
 }
 
 ps::value value::null() {
@@ -207,6 +237,16 @@ ps::value value::from(ps::memory_pool& memory, int v) {
     val.ptr = memory.allocate<ps::integer>();
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::integer>(val.ptr) = v;
+    return val;
+}
+
+ps::value value::from(ps::memory_pool& memory, unsigned int v) {
+    ps::value val {};
+    val.memory = &memory;
+    val.tpe = type::uint;
+    val.ptr = memory.allocate<ps::uint>();
+    if (val.ptr == ps::null_pointer) throw std::bad_alloc();
+    memory.get<ps::uint>(val.ptr) = v;
     return val;
 }
 
@@ -235,6 +275,7 @@ ps::value value::from(ps::memory_pool& memory, ps::list_type const& v) {
     val.memory = &memory;
     val.tpe = type::list;
     val.ptr = memory.allocate<ps::list>();
+    val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::list>(val.ptr) = v;
     return val;
@@ -245,6 +286,7 @@ ps::value value::from(ps::memory_pool& memory, ps::string_type const& v) {
     val.memory = &memory;
     val.tpe = type::str;
     val.ptr = memory.allocate<ps::str>();
+    val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::str>(val.ptr) = v;
     return val;
@@ -255,6 +297,7 @@ ps::value value::from(ps::memory_pool& memory, ps::struct_type const& v) {
     val.memory = &memory;
     val.tpe = type::structure;
     val.ptr = memory.allocate<ps::structure>();
+    val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::structure>(val.ptr) = v;
     return val;

@@ -51,7 +51,7 @@ content <- (comment / element / namespace_decl / function / struct)* { no_ast_op
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- < '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
+operator <- <  '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -80,18 +80,18 @@ identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 literal <- boolean / string / number
 number <- float / integer
 integer <- < [0-9]+ >
-float <- < [0-9]+.[0-9] >
+float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
 boolean <- < 'true' / 'false' >
 
 # ================= typenames =================
 
-typename <- builtin_type / namespace_list? identifier
+typename <- builtin_type / namespace_list? identifier { no_ast_opt }
 # typenames can be prefixed by namespace qualifiers
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
 # match builtin types separately for easier interpreting
-builtin_type <- 'int' / 'float' / 'str' / 'list' / 'any'
+builtin_type <- 'uint' / 'int' / 'float' / 'str' / 'list' / 'any'
 
 # ================= namespaces =================
 
@@ -112,7 +112,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print' / '__readln'
+builtin_function <- '__print' / '__readln' / '__time'
 
 # ================= structs =================
 
@@ -171,7 +171,7 @@ compound <- element / (brace_open element* brace_close) { no_ast_opt }
 expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression / access_expression
 
 # ----- constructor epxression -----
-constructor_expression <- identifier space '{' argument_list? '}'
+constructor_expression <- typename space '{' argument_list? '}'
 
 # ----- list expression -----
 list_expression <- list_open argument_list? list_close
@@ -181,11 +181,11 @@ op_expression <- atom (operator atom)* {
     precedence
     L = += -= *= /=
     L == != <= >= < >
-    L - +
+    L - + << >> ^ & %
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (access_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (access_expression / constructor_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
@@ -382,6 +382,31 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         }
     }
 
+    if (node_is_type(node, "for")) {
+        peg::Ast const* content = find_child_with_type(node, "for_content");
+        peg::Ast const* compound = find_child_with_type(node, "compound");
+        // TODO: add range-for
+        peg::Ast const* initializer = find_child_with_type(content, "declaration");
+        peg::Ast const* condition = find_child_with_type(content, "expression");
+        peg::Ast const* on_iterate = nullptr;
+        for (auto const& child : content->nodes) {
+            if (child.get() == condition) continue;
+            if (node_is_type(child.get(), "expression") || node_is_type(child.get(), "statement"))  {
+                on_iterate = child.get();
+                break;
+            }
+        }
+        block_scope iterator_scope {};
+        iterator_scope.parent = scope;
+        execute(initializer, &iterator_scope, namespace_prefix);
+        while(static_cast<bool>(evaluate_expression(condition, &iterator_scope))) {
+            block_scope local_scope {};
+            local_scope.parent = &iterator_scope;
+            execute(compound, &local_scope, namespace_prefix);
+            execute(on_iterate, &iterator_scope, namespace_prefix);
+        }
+    }
+
     if (has_returned()) return *call_stack.top().return_val;
     else return ps::value::null();
 }
@@ -535,6 +560,11 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == ">") return left > right;
     if (op_str == ">=") return left >= right;
     if (op_str == "<=") return left <= right;
+    if (op_str == "<<") return left << right;
+    if (op_str == ">>") return left >> right;
+    if (op_str == "^") return left ^ right;
+    if (op_str == "&") return left & right;
+    if (op_str == "%") return left % right;
 
     // all other operators are 'mutable' operators, meaning they modify the left-hand side in some way or another.
     // in this case we would like to find out if the left side is an assignable identifier.
@@ -556,6 +586,9 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == "-=") return *value -= right;
     if (op_str == "*=") return *value *= right;
     if (op_str == "/=") return *value /= right;
+    if (op_str == "^=") return *value ^= right;
+    if (op_str == "&=") return *value &= right;
+    if (op_str == "%=") return *value %= right;
 
     else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
 }
@@ -699,6 +732,8 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
         std::string input {};
         std::getline(*exec_ctx.in, input);
         return ps::value::from(memory(), string_type { input });
+    } else if (name == "__time") {
+        return ps::value::from(memory(), (int)std::time(nullptr));
     }
 
     return ps::value::null();
@@ -712,10 +747,34 @@ ps::value context::evaluate_list(peg::Ast const* node, block_scope* scope) {
 ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
     // TODO: add support for builtin types here!
-    peg::Ast const* type = find_child_with_type(node, "identifier");
-    std::string struct_name = type->token_to_string();
+    peg::Ast const* type = find_child_with_type(node, "typename");
+    peg::Ast const* builtin_type = find_child_with_type(type, "builtin_type");
+    if (builtin_type) {
+        std::string const name = builtin_type->token_to_string();
+        if (name == "int") {
+            if (arguments.empty()) return ps::value::from(memory(), int {});
+            else return ps::value::from(memory(), arguments[0].cast<int>());
+        } else if (name == "uint") {
+            if (arguments.empty()) return ps::value::from(memory(), unsigned {});
+            else return ps::value::from(memory(), arguments[0].cast<unsigned int>());
+        } else throw std::runtime_error("not implemented");
+    }
+    std::string namespace_name {};
+    peg::Ast const* namespace_list = find_child_with_type(type, "namespace_list");
+    if (namespace_list) {
+        for (auto const& child : namespace_list->nodes) {
+            if (node_is_type(child.get(), "namespace")) {
+                namespace_name += child->token_to_string() + '.';
+            }
+        }
+    }
+
+    peg::Ast const* name = find_child_with_type(type, "identifier");
+    std::string struct_name = namespace_name + name->token_to_string();
     auto it = structs.find(struct_name);
-    if (it == structs.end()) throw std::runtime_error("Struct '" + struct_name + "' not defined in current scope.");
+    if (it == structs.end()) {
+        throw std::runtime_error("Struct '" + struct_name + "' not defined in current scope.");
+    }
     auto const& struct_def = it->second;
     std::unordered_map<std::string, ps::value> initializers;
     for (int i = 0; i < arguments.size(); ++i) {

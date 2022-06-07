@@ -374,6 +374,31 @@ TEST_CASE("lists") {
     }
 }
 
+TEST_CASE("reference types") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    std::ostringstream out {};
+    ps::execution_context exec {};
+    exec.out = &out;
+
+    std::string source = R"(
+        import std.io;
+        fn f(x: list) -> void {
+            x[1] = 3;
+        }
+
+        let l = [1, 1, 1];
+        f(l);
+        // expected result: 3
+        std.io.print(l[1]);
+    )";
+
+    ps::script script(source, ctx);
+    ctx.execute(script, exec);
+    CHECK(output_equal(exec, "3\n"));
+}
+
 TEST_CASE("strings") {
     constexpr std::size_t memsize = 4096;
     ps::context ctx(memsize);

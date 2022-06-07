@@ -17,6 +17,7 @@ class value;
 enum class type {
     null,
     integer,
+    uint,
     // float
     real,
     boolean,
@@ -167,6 +168,32 @@ T operator/(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator/ not supported for this type");
 }
 
+template<typename T, typename U>
+T operator<<(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator<< not supported for this type");
+}
+
+template<typename T, typename U>
+T operator>>(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator>> not supported for this type");
+}
+
+template<typename T, typename U>
+T operator^(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator^ not supported for this type");
+}
+
+template<typename T, typename U>
+T operator&(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator& not supported for this type");
+}
+
+template<typename T, typename U>
+T operator%(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator% not supported for this type");
+}
+
+
 template<typename T>
 std::ostream& operator<<(std::ostream& out, value_storage<T> const& value) {
     return out << value.value();
@@ -280,6 +307,57 @@ std::common_type_t<T, U> operator/(arithmetic_type<T> const& lhs, U const& rhs) 
     return lhs.value() / rhs;
 }
 
+template<typename T, typename U> requires plib::lshift<T, U>
+std::common_type_t<T, U> operator<<(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() << rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::lshift<T, U>
+std::common_type_t<T, U> operator<<(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() << rhs;
+}
+
+template<typename T, typename U> requires plib::rshift<T, U>
+std::common_type_t<T, U> operator>>(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() >> rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::rshift<T, U>
+std::common_type_t<T, U> operator>>(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() >> rhs;
+}
+
+template<typename T, typename U> requires plib::xors<T, U>
+std::common_type_t<T, U> operator^(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() ^ rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::xors<T, U>
+std::common_type_t<T, U> operator^(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() ^ rhs;
+}
+
+template<typename T, typename U> requires plib::bitwise_and<T, U>
+std::common_type_t<T, U> operator&(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() & rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::bitwise_and<T, U>
+std::common_type_t<T, U> operator&(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() & rhs;
+}
+
+
+template<typename T, typename U> requires plib::bitwise_and<T, U>
+std::common_type_t<T, U> operator%(arithmetic_type<T> const& lhs, arithmetic_type<U> const& rhs) {
+    return lhs.value() % rhs.value();
+}
+
+template<typename T, typename U> requires std::is_pod_v<U> && plib::modulo<T, U>
+std::common_type_t<T, U> operator%(arithmetic_type<T> const& lhs, U const& rhs) {
+    return lhs.value() % rhs;
+}
+
 // TODO: replace stored vector and string by custom types that use our memory allocator
 
 class list_type {
@@ -301,6 +379,11 @@ public:
     friend std::ostream& operator<<(std::ostream& out, list_type const& list);
 
     inline std::vector<ps::value> const& representation() const { return storage; }
+
+    template<typename T>
+    explicit operator T() const {
+        throw std::runtime_error("Invalid cast");
+    }
 
 private:
     std::vector<ps::value> storage;
@@ -326,6 +409,11 @@ public:
 
     inline std::string const& representation() const { return storage; }
 
+    template<typename T>
+    explicit operator T() const {
+        throw std::runtime_error("Invalid cast");
+    }
+
 private:
     std::string storage {};
 };
@@ -345,11 +433,17 @@ public:
 
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 
+    template<typename T>
+    explicit operator T() const {
+        throw std::runtime_error("Invalid cast");
+    }
+
 private:
     std::unordered_map<std::string, ps::value> members;
 };
 
 using integer = arithmetic_type<int>;
+using uint = arithmetic_type<unsigned int>;
 using real = arithmetic_type<float>;
 using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
@@ -378,6 +472,7 @@ public:
 
     static ps::value null();
     static ps::value from(ps::memory_pool& memory, int v);
+    static ps::value from(ps::memory_pool& memory, unsigned int v);
     static ps::value from(ps::memory_pool& memory, float v);
     static ps::value from(ps::memory_pool& memory, bool v);
     static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
@@ -409,6 +504,9 @@ public:
         return *memory;
     }
 
+    template<typename T>
+    T cast() const;
+
     friend std::ostream& operator<<(std::ostream& out, value const& v);
 
 private:
@@ -419,6 +517,9 @@ private:
     // Pointer to allocated memory for this value.
     ps::pointer ptr = ps::null_pointer;
     type tpe{};
+    std::shared_ptr<int> refcount = nullptr;
+
+    void on_destroy();
 };
 
 template<typename F>
@@ -428,6 +529,9 @@ void visit_value(value& v, F&& callable) {
             break;
         case type::integer:
             callable(static_cast<ps::integer&>(v));
+            break;
+        case type::uint:
+            callable(static_cast<ps::uint&>(v));
             break;
         case type::real:
             callable(static_cast<ps::real&>(v));
@@ -459,6 +563,9 @@ void visit_value(value const& v, F&& callable) {
         case type::integer:
             callable(static_cast<ps::integer const&>(v));
             break;
+        case type::uint:
+            callable(static_cast<ps::uint const&>(v));
+            break;
         case type::real:
             callable(static_cast<ps::real const&>(v));
             break;
@@ -477,6 +584,15 @@ void visit_value(value const& v, F&& callable) {
         case type::external_object:
             break;
     }
+}
+
+template<typename T>
+T value::cast() const {
+    T result = {};
+    visit_value(*this, [&result](auto const& v) {
+        result = static_cast<T>(v.value());
+    });
+    return result;
 }
 
 #define GEN_VALUE_OP(op) inline ps::value operator op (ps::value const& lhs, ps::value const& rhs) { \
@@ -516,12 +632,20 @@ GEN_VALUE_OP(<)
 GEN_VALUE_OP(>)
 GEN_VALUE_OP(<=)
 GEN_VALUE_OP(>=)
+GEN_VALUE_OP(<<)
+GEN_VALUE_OP(>>)
+GEN_VALUE_OP(^)
+GEN_VALUE_OP(&)
+GEN_VALUE_OP(%)
 
-// +=, -=, *=, /=
+// +=, -=, *=, /= etc
 GEN_MUTABLE_OP(+)
-GEN_MUTABLE_OP(-);
-GEN_MUTABLE_OP(*);
-GEN_MUTABLE_OP(/);
+GEN_MUTABLE_OP(-)
+GEN_MUTABLE_OP(*)
+GEN_MUTABLE_OP(/)
+GEN_MUTABLE_OP(^)
+GEN_MUTABLE_OP(&)
+GEN_MUTABLE_OP(%)
 
 #undef GEN_VALUE_OP
 #undef GEN_MUTABLE_OP
