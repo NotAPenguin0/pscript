@@ -12,7 +12,18 @@ list_type::list_type(std::vector<ps::value> const& values) {
 }
 
 void list_type::append(value const& val) {
+    // TODO: Check stored type against pushed value?
+    // Note that this would be hard to guarantee with the reference in get().
     storage.push_back(val);
+}
+
+ps::value& list_type::get(size_t index) {
+    if (index >= storage.size()) throw std::out_of_range("ps::list index out of range");
+    return storage[index];
+}
+
+size_t list_type::size() const {
+    return storage.size();
 }
 
 std::ostream& operator<<(std::ostream& out, list_type const& list) {

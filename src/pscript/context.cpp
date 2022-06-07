@@ -2,7 +2,9 @@
 
 #include <peglib.h>
 
-#include <iostream> // debug
+#include <iostream>
+#include <fstream>
+#include <string>
 
 // TODO: proper error reporting
 
@@ -10,6 +12,8 @@ namespace ps {
 
 // Not too proud of this one, but moving to an external file is also not optimal
 static const char* grammar = R"(
+# ================= control sequences =================
+
 # --------------------------------
 # Explanation of basic PEG syntax:
 # --------------------------------
@@ -44,7 +48,7 @@ script <- content
 # - namespace declarations
 # - functions - Starts a function declaration.
 # - structs - Starts a struct declaration
-content <- (comment / element / namespace_decl / function / struct)*
+content <- (comment / element / namespace_decl / function / struct)* { no_ast_opt }
 
 # ================= basic syntactical symbols =================
 
@@ -89,7 +93,7 @@ typename <- builtin_type / namespace_list? identifier
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
 # match builtin types separately for easier interpreting
-builtin_type <- 'int' / 'float' / 'str' / 'list'
+builtin_type <- 'int' / 'float' / 'str' / 'list' / 'any'
 
 # ================= namespaces =================
 
@@ -139,12 +143,10 @@ statement_base <- import / return / declaration / expression
 
 # ================= import statements =================
 
-# import my_module.function;
-# import my_module.*;
+# import folder.subfolder.xyz.module;
 
-import <- 'import ' module
-module <- (module_name dot)? (identifier / module_import_all)
-module_import_all <- star
+import <- 'import ' (module_folder dot)* module_name
+module_folder <- identifier
 module_name <- identifier
 
 # ================= return statements =================
@@ -166,7 +168,8 @@ compound <- element / (brace_open element* brace_close) { no_ast_opt }
 # - a list expression in the form [list_elements...]
 # - an 'operator' epxression in the form expression operator expression (ex. a == 8)
 # - a call expression in the form my_function(arguments...)
-expression <- constructor_expression / list_expression / op_expression / call_expression
+# - an indexing expression x[y]
+expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression
 
 # ----- constructor epxression -----
 constructor_expression <- identifier space '{' argument_list? '}'
@@ -183,13 +186,16 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (parens_open expression parens_close / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
 call_expression <- namespace_list? (identifier / builtin_function) space parens_open argument_list? parens_close
 argument_list <- argument ( comma argument )* { no_ast_opt }
 argument <- expression
+
+# ----- indexing expression -----
+index_expression <- identifier list_open expression list_close
 
 # ================= control sequences =================
 
@@ -297,14 +303,14 @@ void context::execute(ps::script const& script) {
     execute(ast.get(), nullptr); // start execution in global scope
 }
 
-ps::value context::execute(peg::Ast const* node, block_scope* scope) {
+ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {
     // TODO: Rework return value system to put return value in call stack instead!
     if (node_is_type(node, "declaration")) {
         evaluate_declaration(node, scope);
     }
 
     if (node_is_type(node, "function")) {
-        evaluate_function_definition(node);
+        evaluate_function_definition(node, namespace_prefix);
     }
 
     if (node_is_type(node, "call_expression")) {
@@ -320,9 +326,13 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope) {
         return !call_stack.empty() && call_stack.top().return_val != std::nullopt;
     };
 
+    if (node_is_type(node, "import")) {
+        evaluate_import(node);
+    }
+
     if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
         for (auto const& child : node->nodes) {
-            execute(child.get(), scope);
+            execute(child.get(), scope, namespace_prefix);
 
             if (has_returned()) return *call_stack.top().return_val;
         }
@@ -391,7 +401,7 @@ void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
     ps::variable& var = create_variable(identifier->token_to_string(), std::move(init_val), scope);
 }
 
-void context::evaluate_function_definition(peg::Ast const* node) {
+void context::evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix) {
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* params = find_child_with_type(node, "parameter_list");
 
@@ -407,9 +417,47 @@ void context::evaluate_function_definition(peg::Ast const* node) {
         }
     }
     // TODO: return type information?
-    auto it = functions.insert({identifier->token_to_string(), std::move(func)});
+    std::string name = namespace_prefix + identifier->token_to_string();
+    auto it = functions.insert({name, std::move(func)});
     // set key reference
     it.first->second.name = it.first->first;
+}
+
+static std::string read_script(std::string const& filename) {
+    std::ifstream file {filename};
+    return std::string { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
+}
+
+void context::evaluate_import(peg::Ast const* node) {
+    std::vector<std::string> folders = {};
+    for (auto const& child : node->nodes) {
+        if (node_is_type(child.get(), "module_folder")) {
+            folders.push_back(child->token_to_string());
+        }
+    }
+
+    peg::Ast const* module_name = find_child_with_type(node, "module_name");
+
+    // resolve module folders + name into a module file
+    std::string filepath = "pscript-modules/";
+    for (auto const& folder : folders) {
+        filepath += folder + '/';
+    }
+    filepath += module_name->token_to_string() + ".ps";
+
+    // import it
+    imported_scripts.emplace_back(read_script(filepath), *this);
+    peg::Ast const* ast = imported_scripts.back().ast().get();
+
+    // build namespace string
+    std::string namespace_prefix;
+    for (auto const& folder : folders) {
+        namespace_prefix += folder + '.';
+    }
+    namespace_prefix += module_name->token_to_string() + '.';
+    // run imported scripts in a local scope to make sure variables dont collide.
+    block_scope local_scope {};
+    execute(ast, &local_scope, namespace_prefix);
 }
 
 ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
@@ -453,13 +501,21 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     // all other operators are 'mutable' operators, meaning they modify the left-hand side in some way or another.
     // in this case we would like to find out if the left side is an assignable identifier.
     // if so, we do the assignment
-    std::string tok = lhs->token_to_string();
-    ps::variable& var = get_variable(tok, scope);
-    if (op_str == "=") return var.value() = right;
-    if (op_str == "+=") return var.value() += right;
-    if (op_str == "-=") return var.value() -= right;
-    if (op_str == "*=") return var.value() *= right;
-    if (op_str == "/=") return var.value() /= right;
+
+    ps::value* value = nullptr;
+    // special case for list index expressions
+    if (node_is_type(lhs, "index_expression")) {
+        value = &index_list(lhs, scope);
+    } else {
+        std::string tok = lhs->token_to_string();
+        ps::variable& var = get_variable(tok, scope);
+        value = &var.value();
+    }
+    if (op_str == "=") return *value = right;
+    if (op_str == "+=") return *value += right;
+    if (op_str == "-=") return *value -= right;
+    if (op_str == "*=") return *value *= right;
+    if (op_str == "/=") return *value /= right;
 
     else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
 }
@@ -531,6 +587,8 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
             if (type == ps::type::list) {
                 return evaluate_list_member_function(func_name, *var, node, scope);
             }
+        } else { // this is a regular function call, still make sure to set lookup name properly
+            func_name = namespace_name + '.' + func_name;
         }
     }
 
@@ -552,9 +610,14 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
 
+    ps::value& val = object.value();
     if (name == "append") {
         if (arguments.size() != 1) throw std::runtime_error("[list::append] - expected 1 argument");
-        static_cast<ps::list&>(object.value()).value().append(arguments.front());
+        static_cast<ps::list&>(val)->append(arguments.front());
+    }
+
+    if (name == "size") {
+        return ps::value::from(memory(), (int)static_cast<ps::list&>(val)->size());
     }
 
     return ps::value::null();
@@ -580,6 +643,19 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
 ps::value context::evaluate_list(peg::Ast const* node, block_scope* scope) {
    auto arguments = evaluate_argument_list(node, scope);
    return ps::value::from(memory(), ps::list_type{ arguments });
+}
+
+ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
+    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    peg::Ast const* index_expr = find_child_with_type(node, "expression");
+
+    ps::value index_expr_val = evaluate_expression(index_expr, scope);
+    auto& index = static_cast<ps::integer&>(index_expr_val);
+    auto& list_val = get_variable_value(identifier->token_to_string(), scope);
+    auto& list = static_cast<ps::list&>(list_val);
+
+    ps::value& value = list->get(index.value());
+    return value;
 }
 
 ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope) {
@@ -613,6 +689,10 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
 
     if (node_is_type(node, "list_expression")) {
         return evaluate_list(node, scope);
+    }
+
+    if (node_is_type(node, "index_expression")) {
+        return index_list(node, scope);
     }
 
     return ps::value::null();

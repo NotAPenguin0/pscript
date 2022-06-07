@@ -105,12 +105,13 @@ private:
     ps::memory_pool mem;
     std::unordered_map<std::string, ps::variable> global_variables;
     std::unordered_map<std::string, function> functions;
+    std::vector<ps::script> imported_scripts {}; // we need to keep these around so the ast nodes stay valid.
 
     std::stack<function_call> call_stack {};
 
     std::unique_ptr<peg::parser> ast_parser;
 
-    ps::value execute(peg::Ast const* node, block_scope* scope);
+    ps::value execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix = ""); // namespace prefix used for importing
 
     peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) const noexcept;
 
@@ -120,7 +121,9 @@ private:
     bool node_is_type(peg::Ast const* node, std::string_view type) const noexcept;
 
     void evaluate_declaration(peg::Ast const* node, block_scope* scope);
-    void evaluate_function_definition(peg::Ast const* node);
+    void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
+
+    void evaluate_import(peg::Ast const* node);
 
     std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope);
 
@@ -132,6 +135,9 @@ private:
     ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
+
+    // return reference to list value, given index-expr node.
+    ps::value& index_list(peg::Ast const* node, block_scope* scope);
 
     ps::value evaluate_operand(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope);

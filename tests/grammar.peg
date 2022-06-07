@@ -1,3 +1,5 @@
+# ================= control sequences =================
+
 # --------------------------------
 # Explanation of basic PEG syntax:
 # --------------------------------
@@ -32,7 +34,7 @@ script <- content
 # - namespace declarations
 # - functions - Starts a function declaration.
 # - structs - Starts a struct declaration
-content <- (comment / element / namespace_decl / function / struct)*
+content <- (comment / element / namespace_decl / function / struct)* { no_ast_opt }
 
 # ================= basic syntactical symbols =================
 
@@ -77,7 +79,7 @@ typename <- builtin_type / namespace_list? identifier
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
 # match builtin types separately for easier interpreting
-builtin_type <- 'int' / 'float' / 'str' / 'list'
+builtin_type <- 'int' / 'float' / 'str' / 'list' / 'any'
 
 # ================= namespaces =================
 
@@ -127,12 +129,10 @@ statement_base <- import / return / declaration / expression
 
 # ================= import statements =================
 
-# import my_module.function;
-# import my_module.*;
+# import folder.subfolder.xyz.module;
 
-import <- 'import ' module
-module <- (module_name dot)? (identifier / module_import_all)
-module_import_all <- star
+import <- 'import ' (module_folder dot)* module_name
+module_folder <- identifier
 module_name <- identifier
 
 # ================= return statements =================
@@ -154,7 +154,8 @@ compound <- element / (brace_open element* brace_close) { no_ast_opt }
 # - a list expression in the form [list_elements...]
 # - an 'operator' epxression in the form expression operator expression (ex. a == 8)
 # - a call expression in the form my_function(arguments...)
-expression <- constructor_expression / list_expression / op_expression / call_expression
+# - an indexing expression x[y]
+expression <- constructor_expression / op_expression / index_expression / list_expression / call_expression
 
 # ----- constructor epxression -----
 constructor_expression <- identifier space '{' argument_list? '}'
@@ -171,13 +172,16 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (parens_open expression parens_close / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
 call_expression <- namespace_list? (identifier / builtin_function) space parens_open argument_list? parens_close
 argument_list <- argument ( comma argument )* { no_ast_opt }
 argument <- expression
+
+# ----- indexing expression -----
+index_expression <- identifier list_open expression list_close
 
 # ================= control sequences =================
 

@@ -39,3 +39,13 @@ target_sources(plib PRIVATE
         src/pscript/lexer.cpp
 )
 target_include_directories(plib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
+
+# copy over modules to build directory
+file(GLOB_RECURSE MODULE_FILES "modules/*")
+add_custom_command(
+        TARGET plib POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/modules/" ${${CMAKE_PROJECT_NAME}_BINARY_DIR}/pscript-modules
+        DEPENDS ${MODULE_FILES}
+        COMMENT "Copying plib modules"
+        VERBATIM
+)

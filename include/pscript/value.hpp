@@ -75,6 +75,14 @@ public:
         return val;
     }
 
+    T* operator->() {
+        return &val;
+    }
+
+    T const* operator->() const {
+        return &val;
+    }
+
 protected:
     T val = {};
 };
@@ -269,6 +277,9 @@ public:
     list_type& operator=(list_type&&) noexcept = default;
 
     void append(ps::value const& val);
+
+    ps::value& get(size_t index);
+    size_t size() const;
 
     friend std::ostream& operator<<(std::ostream& out, list_type const& list);
 

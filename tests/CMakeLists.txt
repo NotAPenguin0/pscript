@@ -12,3 +12,12 @@ FetchContent_MakeAvailable(catch2)
 add_executable(plib-test main.cpp)
 target_link_libraries(plib-test PRIVATE plib Catch2::Catch2WithMain)
 target_compile_options(plib-test PRIVATE -Wno-macro-redefined)
+
+file(GLOB_RECURSE MODULE_FILES "../modules/*")
+add_custom_command(
+        TARGET plib-test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../modules/" ${CMAKE_CURRENT_BINARY_DIR}/pscript-modules
+        DEPENDS ${MODULE_FILES}
+        COMMENT "Copying plib modules - tests"
+        VERBATIM
+)

@@ -323,4 +323,40 @@ TEST_CASE("lists") {
         ps::script script(source, ctx);
         ctx.execute(script);
     }
+
+    SECTION("indexing") {
+        std::string source = R"(
+            let my_list = [1, 2, 3];
+            my_list[1] = 10;
+            __print(my_list[1]);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("size query") {
+        std::string source = R"(
+            let my_list = [1, 2, 3];
+            __print(my_list.size());
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}
+
+TEST_CASE("modules") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    SECTION("std import") {
+        std::string source = R"(
+            import std.io;
+            std.io.print(5);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
 }
