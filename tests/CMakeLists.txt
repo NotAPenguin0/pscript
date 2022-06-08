@@ -13,6 +13,10 @@ add_executable(plib-test main.cpp)
 target_link_libraries(plib-test PRIVATE plib Catch2::Catch2WithMain)
 target_compile_options(plib-test PRIVATE -Wno-macro-redefined -Wno-format)
 
+if (${PLIB_BUILD_PSCRIPT_DEMO_APP})
+    add_subdirectory("perceptron_demo")
+endif()
+
 file(GLOB_RECURSE MODULE_FILES "../modules/*")
 add_custom_command(
         TARGET plib-test POST_BUILD

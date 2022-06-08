@@ -15,6 +15,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 option(PLIB_ENABLE_TESTS "Enable building tests" ${is_root_project})
+option(PLIB_BUILD_PSCRIPT_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
 
 if(PLIB_ENABLE_TESTS)
   add_subdirectory(tests)
