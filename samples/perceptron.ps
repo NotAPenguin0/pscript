@@ -1,9 +1,11 @@
+// Demo PScript program that implements a simple single-layer perceptron.
+
 import std.io;
 import std.random;
 
 struct AIState {
     weights: list = [];
-    bias: int = 0;
+    bias: float = 0;
     learning_rate: float = 0.0;
 };
 
@@ -35,10 +37,8 @@ fn list_size(x: list) -> int {
 
 fn ai_output(state: AIState, input: list) -> float {
     let unbiased = dot(state->weights, input);
-    // apply n * bias to the output
-    // the reason for this call is because an access into a member call would not parse with our current system.
-    let n = list_size(state->weights);
-    return unbiased + n * state->bias;
+    // apply bias to output
+    return unbiased + state->bias;
 }
 
 fn sample_output(state: AIState, sample: Sample) -> float {
@@ -57,60 +57,84 @@ fn init_state(in_vec_size: int, bias: float, learning_rate: float) -> AIState {
     return state;
 }
 
-// applies one step of training and updates the state values with new ones.
-// we can do this since structure types are references now.
-fn step_training(state: AIState, sample: Sample) -> void {
-    let input = sample->input;
-    let output = sample_output(state, sample);
-    let expected = sample->output;
-    let weights = state->weights;
-    let fmt = "iteration: in = {}, out = {}, expected = {}, weights = {}";
-    std.io.print(fmt.format(input, output, expected, weights));
-    for (let i = 0; i < weights.size(); i += 1) {
-        let difference = expected[i] - output[i];
-        weights[i] = weights[i] + state->learning_rate * difference * input[i];
-        let fmt = "new weight_{} = {}";
-    }
-}
-
 // This will create samples trying to make the perceptron classify points with y < 0 as 0, and y > 0 as 1.
 fn obtain_training_samples() -> list {
-    return [Sample {[0.2, -1.0], 0.0}, Sample {[0.4, 1.0], 1.0}, Sample {[-3.0, -0.5], 0.0}, Sample{[2.0, 0.0], 0.5}, Sample{[-10.0, 0.3], 1.0}];
+    let inputs = [
+         Sample{[0.72,0.82],-1.0},
+         Sample{[0.91,-0.69],-1.0},
+         Sample{[0.03,0.93],-1.0},
+         Sample{[0.12,0.25],-1.0},
+         Sample{[0.96,0.47],-1.0},
+         Sample{[0.8,-0.75],-1.0},
+         Sample{[0.46,0.98],-1.0},
+         Sample{[0.66,0.24],-1.0},
+         Sample{[0.72,-0.15],-1.0},
+         Sample{[0.35,0.01],-1.0},
+         Sample{[-0.11,0.1],1.0},
+         Sample{[0.31,-0.96],1.0},
+         Sample{[0.0,-0.26],1.0},
+         Sample{[-0.43,-0.65],1.0},
+         Sample{[0.57,-0.97],1.0},
+         Sample{[-0.72,-0.64],1.0},
+         Sample{[-0.25,-0.43],1.0},
+         Sample{[-0.12,-0.9],1.0},
+         Sample{[-0.58,0.62],1.0},
+         Sample{[-0.77,-0.76],1.0}
+    ];
+    return inputs;
 }
 
 fn print_classification(state: AIState, input: list) -> void {
     let classification = ai_output(state, input);
-    if (classification < 0.5) std.pio.print("Below y axis");
-    else std.io.print("Above y axis");
+    let fmt = "classifier for input = {}: {}";
+    std.io.print(fmt.format(input, classification));
 }
 
 std.io.print("pscript sample program, simple single layer perceptron");
 
-let rng = std.random.init_rand();
-std.io.print(rng);
-
-let r = [];
-for (let i = 0; i < 10; i += 1) {
-    r.append(std.random.rand(rng, 0, 10));
-}
-
-std.io.print(r);
-
 let training = obtain_training_samples();
-let state = init_state(2, 0, 0.02);
+let state = init_state(2, 1.0, 1.0);
 
-let num_iterations = 5;
-for (let it = 0; it < num_iterations; it += 1) {
+let threshold = 0.0;
+
+let max_iterations = 10;
+let hits = 0;
+let it = 0;
+while(it < max_iterations && hits != training.size()) {
+    hits = 0;
+
     for (let t = 0; t < training.size(); t += 1) {
-        step_training(state, training[t]);
+        let sample = training[t];
+        let inputs = sample->input;
+        let output = sample_output(state, sample);
+        let y = 0.0;
+
+        if (output > threshold) {
+            y = 1.0;
+        } else {
+            y = -1.0;
+        }
+
+        // update weights if output does not match expected output
+        if (y == sample->output) {
+            hits += 1;
+        } else {
+            let weights = state->weights;
+            let n = weights.size();
+            for (let j = 0; j < n; j += 1) {
+                weights[j] = weights[j] + (state->learning_rate * sample->output * inputs[j]);
+            }
+            state->bias = state->bias + state->learning_rate * sample->output;
+            let fmt = "Error - updating weight to {}";
+            std.io.print(fmt.format(weights));
+        }
     }
+
+    let fmt = "Iteration {}: Correct: {} / {}";
+    std.io.print(fmt.format(it, hits, training.size()));
+    it += 1;
 }
 
-std.io.print("Training complete");
+let fmt = "Training complete in {} iterations";
+std.io.print(fmt.format(it));
 std.io.print("Test classification results:");
-
-print_classification(state, [0, -10]);
-print_classification(state, [0, 10]);
-print_classification(state, [0, 0]);
-print_classification(state, [-4, -1]);
-print_classification(state, [3, 0.9]);

@@ -124,6 +124,16 @@ bool operator!=(value_storage<T> const& lhs, value_storage<U> const& rhs) {
 }
 
 template<typename T, typename U>
+T operator&&(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator&& not supported for this type");
+}
+
+template<typename T, typename U>
+T operator||(value_storage<T> const& lhs, value_storage<U> const& rhs) {
+    throw std::runtime_error("operator|| not supported for this type");
+}
+
+template<typename T, typename U>
 bool operator<(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator< not supported for this type");
 }
@@ -450,6 +460,14 @@ using list = value_storage<list_type>;
 using str = eq_comparable<string_type>;
 using structure = value_storage<struct_type>;
 
+inline bool operator&&(boolean const& lhs, boolean const &rhs) {
+    return lhs.value() && rhs.value();
+}
+
+inline bool operator||(boolean const& lhs, boolean const &rhs) {
+    return lhs.value() && rhs.value();
+}
+
 // string concatenation
 inline string_type operator+(str const& lhs, str const& rhs) {
     return string_type { lhs->representation() + rhs->representation() };
@@ -628,6 +646,8 @@ GEN_VALUE_OP(*)
 GEN_VALUE_OP(/)
 GEN_VALUE_OP(==)
 GEN_VALUE_OP(!=)
+GEN_VALUE_OP(&&)
+GEN_VALUE_OP(||)
 GEN_VALUE_OP(<)
 GEN_VALUE_OP(>)
 GEN_VALUE_OP(<=)

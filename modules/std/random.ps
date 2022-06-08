@@ -8,23 +8,22 @@ struct RandomState {
 fn tea(val0: uint, val1: uint) -> uint {
     let v0 = val0;
     let v1 = val1;
-    let s0 = uint { 0 };
+    let s0 = 0u;
 
     for(let n = 0; n < 16; n += 1) {
-        s0 += uint { 2654435769 };
-        // TODO: literal suffixes!
-        v0 += ((v1 << uint { 4 }) + uint { 2738958700 }) ^ (v1 + s0) ^ ((v1 >> uint { 5 }) + uint { 3355524772 });
-        v1 += ((v0 << uint { 4 }) + uint { 2911926141 }) ^ (v0 + s0) ^ ((v0 >> uint { 5 }) + uint { 2123724318 });
+        s0 += 2654435769u;
+        v0 += ((v1 << 4u) + 2738958700u) ^ (v1 + s0) ^ ((v1 >> 5u) + 3355524772u);
+        v1 += ((v0 << 4u) + 2911926141u) ^ (v0 + s0) ^ ((v0 >> 5u) + 2123724318u);
     }
 
     return v0;
 }
 
 fn lcg(state: RandomState) -> uint {
-    let LCG_A = uint { 1664525 };
-    let LCG_C = uint { 1013904223 };
+    let LCG_A = 1664525u;
+    let LCG_C = 1013904223u;
     state->seed = (LCG_A * state->seed + LCG_C);
-    return state->seed & uint { -1 };
+    return state->seed & -1u;
 }
 
 fn rand_uint(state: RandomState) -> uint {
@@ -37,5 +36,6 @@ fn rand(state: RandomState, min: uint, max: uint) -> uint {
 }
 
 fn init_rand() -> RandomState {
-    return std.random.RandomState { uint { std.time.time() } };
+    // TODO: struct initializer casts to member type instead of taking parameter type
+    return std.random.RandomState { std.time.time() };
 }

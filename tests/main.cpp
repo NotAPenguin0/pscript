@@ -197,6 +197,39 @@ TEST_CASE("script expression parser", "[script]") {
         CHECK(ctx.get_variable_value("y").int_value() == 8);
         CHECK(ctx.get_variable_value("z").int_value() == 8);
     }
+
+    SECTION("floating point") {
+        std::string source = R"(
+            let x = 1.0 + 2.5;
+            let y = 1.0 * 2.5;
+            let z = 1 * 3.5;
+            let w = 3.5 * 1;
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+
+        CHECK(ctx.get_variable_value("x").real_value() == 3.5f);
+        CHECK(ctx.get_variable_value("y").real_value() == 2.5f);
+        CHECK(ctx.get_variable_value("z").real_value() == 3.5f);
+        CHECK(ctx.get_variable_value("w").real_value() == 3.5f);
+    }
+}
+
+TEST_CASE("floats in lists", "[script]") {
+    constexpr std::size_t memsize = 512;
+    ps::context ctx(memsize);
+
+    SECTION("base case") {
+        std::string source = R"(
+            let l = [1.2];
+            let a = l[0] * 0.5;
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+        CHECK(ctx.get_variable_value("a").real_value() == 0.6f);
+    }
 }
 
 TEST_CASE("script", "[script]") {
@@ -569,6 +602,7 @@ TEST_CASE("structs") {
         ctx.execute(script);
     }
 }
+
 
 TEST_CASE("perceptron") {
     constexpr size_t memsize = 1024 * 1024;

@@ -51,7 +51,7 @@ content <- (comment / element / namespace_decl / function / struct)* { no_ast_op
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- <  '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
+operator <- <  '&&' / '||' / '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -68,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> ]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> -]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -78,7 +78,8 @@ any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> ]*
 identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
 literal <- boolean / string / number
-number <- float / integer
+number <- (float / integer) literal_suffix?
+literal_suffix <- 'u'
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
@@ -180,6 +181,7 @@ list_expression <- list_open argument_list? list_close
 op_expression <- atom (operator atom)* {
     precedence
     L = += -= *= /=
+    L && ||
     L == != <= >= < >
     L - + << >> ^ & %
     L / *
@@ -527,7 +529,12 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
         if (str_repr.find('.') != std::string::npos) {
             return ps::value::from(memory(), node->token_to_number<ps::real::value_type>());
         } else {
-            return ps::value::from(memory(), node->token_to_number<ps::integer::value_type>());
+            // Check if last character is a literal
+            if (str_repr.back() == 'u') {
+                return ps::value::from(memory(), (unsigned int)std::stoi(str_repr.substr(0, str_repr.size() - 1)));
+            } else {
+                return ps::value::from(memory(), node->token_to_number<ps::integer::value_type>());
+            }
         }
     }
 
@@ -565,6 +572,8 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == "^") return left ^ right;
     if (op_str == "&") return left & right;
     if (op_str == "%") return left % right;
+    if (op_str == "&&") return left && right;
+    if (op_str == "||") return left || right;
 
     // all other operators are 'mutable' operators, meaning they modify the left-hand side in some way or another.
     // in this case we would like to find out if the left side is an assignable identifier.
@@ -733,7 +742,7 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
         std::getline(*exec_ctx.in, input);
         return ps::value::from(memory(), string_type { input });
     } else if (name == "__time") {
-        return ps::value::from(memory(), (int)std::time(nullptr));
+        return ps::value::from(memory(), (unsigned int)std::time(nullptr));
     }
 
     return ps::value::null();
@@ -820,6 +829,34 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
         return evaluate_operand(node, scope);
     }
 
+    if (node_is_type(node, "index_expression")) {
+        return index_list(node, scope);
+    }
+
+    if (node_is_type(node, "constructor_expression")) {
+        return evaluate_constructor_expression(node, scope);
+    }
+
+    if (node_is_type(node, "list_expression")) {
+        return evaluate_list(node, scope);
+    }
+
+    if (node_is_type(node, "access_expression")) {
+        return access_member(node, scope);
+    }
+
+    if (node_is_type(node, "call_expression")) {
+        return evaluate_function_call(node, scope);
+    }
+
+    if (node_is_type(node, "op_expression")) {
+        peg::Ast const* lhs_node = node->nodes[0].get();
+        peg::Ast const* operator_node = node->nodes[1].get();
+        peg::Ast const* rhs_node = node->nodes[2].get();
+
+        return evaluate_operator(lhs_node, operator_node, rhs_node, scope);
+    }
+
     // the atom[operand] case was already handled above.
     if (node_is_type(node, "atom")) {
         // skip over children until we find a child node with a type that we need.
@@ -837,34 +874,6 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
                 }
             }
         }
-    }
-
-    if (node_is_type(node, "call_expression")) {
-        return evaluate_function_call(node, scope);
-    }
-
-    if (node_is_type(node, "op_expression")) {
-        peg::Ast const* lhs_node = node->nodes[0].get();
-        peg::Ast const* operator_node = node->nodes[1].get();
-        peg::Ast const* rhs_node = node->nodes[2].get();
-
-        return evaluate_operator(lhs_node, operator_node, rhs_node, scope);
-    }
-
-    if (node_is_type(node, "constructor_expression")) {
-        return evaluate_constructor_expression(node, scope);
-    }
-
-    if (node_is_type(node, "list_expression")) {
-        return evaluate_list(node, scope);
-    }
-
-    if (node_is_type(node, "index_expression")) {
-        return index_list(node, scope);
-    }
-
-    if (node_is_type(node, "access_expression")) {
-        return access_member(node, scope);
     }
 
     return ps::value::null();

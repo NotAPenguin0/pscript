@@ -37,7 +37,7 @@ content <- (comment / element / namespace_decl / function / struct)* { no_ast_op
 # ================= basic syntactical symbols =================
 
 space <- ' '*
-operator <- <  '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
+operator <- <  '&&' / '||' / '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
 unary_operator <- '-' / '++' / '--' / '!'
 assign <- '='
 colon <- ':'
@@ -54,7 +54,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> ]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> -]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -64,7 +64,8 @@ any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> ]*
 identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
 literal <- boolean / string / number
-number <- float / integer
+number <- (float / integer) literal_suffix?
+literal_suffix <- 'u'
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
@@ -166,6 +167,7 @@ list_expression <- list_open argument_list? list_close
 op_expression <- atom (operator atom)* {
     precedence
     L = += -= *= /=
+    L && ||
     L == != <= >= < >
     L - + << >> ^ & %
     L / *
