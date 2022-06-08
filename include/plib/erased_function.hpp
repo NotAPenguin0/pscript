@@ -12,6 +12,7 @@ namespace plib {
 template<typename V>
 class erased_function {
 public:
+    virtual V call() { return V {}; }
     virtual V call(V v) { return V {}; }
     virtual V call(V v1, V v2) { return V {}; }
     virtual V call(V v1, V v2, V v3) { return V {}; }

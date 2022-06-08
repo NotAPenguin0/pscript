@@ -144,7 +144,7 @@ statement_base <- import / return / declaration / expression
 
 # import folder.subfolder.xyz.module;
 
-import <- 'import ' (module_folder dot)* module_name
+import <- 'import ' (module_folder dot)* module_name { no_ast_opt }
 module_folder <- identifier
 module_name <- identifier
 
@@ -502,15 +502,31 @@ void context::evaluate_import(peg::Ast const* node) {
     peg::Ast const* module_name = find_child_with_type(node, "module_name");
 
     // resolve module folders + name into a module file
-    std::string filepath = "pscript-modules/";
+    std::string path;
     for (auto const& folder : folders) {
-        filepath += folder + '/';
+        path += folder + '/';
     }
-    filepath += module_name->token_to_string() + ".ps";
+    path += module_name->token_to_string() + ".ps";
+
+    std::string filepath = path;
+    for (auto const& mod_path : exec_ctx.module_paths) {
+        filepath = mod_path + path;
+        std::ifstream in { filepath };
+        if (in.is_open()) break; // found matching path
+    }
+
+    // import only if not yet imported
+    auto it = std::find_if(imported_scripts.begin(), imported_scripts.end(), [&filepath](import_data const& i) -> bool {
+        return i.filepath == filepath;
+    });
+
+    if (it != imported_scripts.end()) {
+        return;
+    }
 
     // import it
-    imported_scripts.emplace_back(read_script(filepath), *this);
-    peg::Ast const* ast = imported_scripts.back().ast().get();
+    imported_scripts.push_back(import_data{ filepath, ps::script {read_script(filepath), *this } });
+    peg::Ast const* ast = imported_scripts.back().script.ast().get();
 
     // build namespace string
     std::string namespace_prefix;
@@ -705,7 +721,7 @@ ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* sco
     plib::erased_function<ps::value>* func = exec_ctx.externs->get_function(name);
     auto args = evaluate_argument_list(node, scope);
     if (args.size() > 8) throw std::runtime_error("Tried to do an external call with more than 8 arguments");
-    // TODO: add support for no arguments
+    if (args.empty()) return func->call();
     if (args.size() == 1) return func->call(args[0]);
     if (args.size() == 2) return func->call(args[0], args[1]);
     if (args.size() == 3) return func->call(args[0], args[1], args[2]);

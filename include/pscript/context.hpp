@@ -33,6 +33,7 @@ struct execution_context {
     std::istream* in = &std::cin;
     std::ostream* out = &std::cout;
     extern_function_library* externs = nullptr;
+    std::vector<std::string> module_paths = { "pscript-modules/" };
 };
 
 /**
@@ -136,7 +137,12 @@ private:
     std::unordered_map<std::string, ps::variable> global_variables;
     std::unordered_map<std::string, function> functions;
     std::unordered_map<std::string, struct_description> structs;
-    std::vector<ps::script> imported_scripts {}; // we need to keep these around so the ast nodes stay valid.
+
+    struct import_data {
+        std::string filepath;
+        ps::script script;
+    };
+    std::vector<import_data> imported_scripts {};
     ps::execution_context exec_ctx;
 
     std::stack<function_call> call_stack {};
