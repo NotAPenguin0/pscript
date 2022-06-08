@@ -91,6 +91,30 @@ static bool output_equal(ps::execution_context& exec, std::string const& expecte
     return dynamic_cast<std::ostringstream*>(exec.out)->str() == expected;
 }
 
+class extern_library : public ps::extern_function_library {
+public:
+    template<typename C>
+    void add_function(ps::context& ctx, std::string const& name, C&& callable) {
+        functions.insert({name, plib::make_concrete_function<ps::value>(callable, [&ctx](auto x){
+            return ps::value::from(ctx.memory(), x);
+        })});
+    }
+
+    plib::erased_function<ps::value>* get_function(std::string const& name) override {
+        return functions.at(name);
+    }
+
+    ~extern_library() {
+        for (auto& [k, v] : functions) {
+            delete v;
+        }
+        functions.clear();
+    }
+
+private:
+    std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
+};
+
 TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
     constexpr std::size_t memsize = 1024 * 1024;
@@ -603,6 +627,31 @@ TEST_CASE("structs") {
     }
 }
 
+float add(float a, float b) {
+    return a + b;
+}
+
+TEST_CASE("external functions") {
+    constexpr size_t memsize = 1024;
+    ps::context ctx(memsize);
+
+    extern_library lib {};
+    lib.add_function(ctx, "add", &add);
+
+    ps::execution_context exec {};
+    exec.externs = &lib;
+
+    std::string source = R"(
+        import std.io;
+
+        extern fn add(a: float, b: float) -> float;
+
+        std.io.print(add(1.1, 2.2));
+    )";
+
+    ps::script script(source, ctx);
+    ctx.execute(script, exec);
+}
 
 TEST_CASE("perceptron") {
     constexpr size_t memsize = 1024 * 1024;

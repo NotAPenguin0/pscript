@@ -4,6 +4,8 @@
 #include <pscript/variable.hpp>
 #include <pscript/script.hpp>
 
+#include <plib/erased_function.hpp>
+
 #include <string>
 #include <unordered_map>
 #include <optional>
@@ -17,9 +19,20 @@ namespace peg {
 
 namespace ps {
 
+    // TODO: possibly allow linking multiple function libraries?
+
+/**
+ * @brief Interface class for external functions
+ */
+class extern_function_library {
+public:
+    virtual plib::erased_function<ps::value>* get_function(std::string const& name) = 0;
+};
+
 struct execution_context {
     std::istream* in = &std::cin;
     std::ostream* out = &std::cout;
+    extern_function_library* externs = nullptr;
 };
 
 /**
@@ -153,6 +166,7 @@ private:
     void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
 
     ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name);
     ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
     ps::value evaluate_string_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);

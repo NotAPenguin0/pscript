@@ -440,6 +440,9 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* params = find_child_with_type(node, "parameter_list");
 
+    // If a function is external, this node will be null.
+    // We will use this to test for an external function on the call site, and
+    // execute the external call if so.
     peg::Ast const* content = find_child_with_type(node, "compound");
     function func {};
     func.node = content;
@@ -681,6 +684,11 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
         throw std::runtime_error("[func call] function " + func_name + " not found.\n");
     }
 
+    // If the 'node' field in our function is null, this is an external function call.
+    if (it->second.node == nullptr) {
+        return evaluate_external_call(node, scope, func_name);
+    }
+
     // create function scope for this call
     block_scope local_scope {};
 
@@ -689,6 +697,25 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     ps::value val = execute(it->second.node, &local_scope);
     call_stack.pop();
     return val;
+}
+
+ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
+    if (!exec_ctx.externs) throw std::runtime_error("No function library bound, cannot evaluate external call to " + name);
+
+    plib::erased_function<ps::value>* func = exec_ctx.externs->get_function(name);
+    auto args = evaluate_argument_list(node, scope);
+    if (args.size() > 8) throw std::runtime_error("Tried to do an external call with more than 8 arguments");
+    // TODO: add support for no arguments
+    if (args.size() == 1) return func->call(args[0]);
+    if (args.size() == 2) return func->call(args[0], args[1]);
+    if (args.size() == 3) return func->call(args[0], args[1], args[2]);
+    if (args.size() == 4) return func->call(args[0], args[1], args[2], args[3]);
+    if (args.size() == 5) return func->call(args[0], args[1], args[2], args[3], args[4]);
+    if (args.size() == 6) return func->call(args[0], args[1], args[2], args[3], args[4], args[5]);
+    if (args.size() == 7) return func->call(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+    if (args.size() == 8) return func->call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
+
+    return ps::value::null();
 }
 
 ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {

@@ -23,9 +23,7 @@ enum class type {
     boolean,
     str,
     list,
-    structure,
-    // external functions or classes.
-    external_object
+    structure
 };
 
 template<typename T>
@@ -478,6 +476,7 @@ inline string_type operator+(str const& lhs, str const& rhs) {
  */
 class value {
 public:
+    value() = default;
     value(value const& rhs);
     value& operator=(value const& rhs);
 
@@ -528,8 +527,6 @@ public:
     friend std::ostream& operator<<(std::ostream& out, value const& v);
 
 private:
-    value() = default;
-
     mutable ps::memory_pool* memory = nullptr;
 
     // Pointer to allocated memory for this value.
@@ -566,8 +563,6 @@ void visit_value(value& v, F&& callable) {
         case type::structure:
             callable(static_cast<ps::structure&>(v));
             break;
-        case type::external_object:
-            break;
         default:
             break;
     }
@@ -599,7 +594,7 @@ void visit_value(value const& v, F&& callable) {
         case type::structure:
             callable(static_cast<ps::structure const&>(v));
             break;
-        case type::external_object:
+        default:
             break;
     }
 }
