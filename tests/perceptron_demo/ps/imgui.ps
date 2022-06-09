@@ -1,2 +1,19 @@
-extern fn begin(name: str) -> bool;
+extern fn begin(id: str) -> bool;
 extern fn end() -> void;
+
+extern fn button(id: str) -> bool;
+
+extern fn begin_plot(id: str) -> bool;
+
+struct PlotPoint {
+    x: float = 0.0;
+    y: float = 0.0;
+};
+
+// data must be a list of PlotPoint values.
+extern fn plot_scatter(id: str, data: list) -> void;
+extern fn plot_line(id: str, data: list) -> void;
+
+extern fn next_plot_style(r: int, g: int, b: int) -> void;
+extern fn next_plot_marker_style(size: float, r: int, g: int, b: int) -> void;
+extern fn end_plot() -> void;

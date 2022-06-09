@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include "external/imgui_impl_glfw.h"
 #include "external/imgui_impl_opengl3.h"
+#include "implot.h"
 
 #include <imgui/imgui.h>
 
@@ -53,6 +54,55 @@ int imgui_end() {
     return 0;
 }
 
+bool imgui_button(ps::string_type const& str) {
+    return ImGui::Button(str.representation().c_str());
+}
+
+ImPlotPoint list_data_getter(void* data, int idx) {
+    ps::list_type const* list = (ps::list_type const*)data;
+    auto const& vec = list->representation();
+    ps::value const& val = vec[idx];
+
+    ps::struct_type const& struc = static_cast<ps::struct_type const&>(val);
+    ps::value const& x = struc.access("x");
+    ps::value const& y = struc.access("y");
+
+    ImPlotPoint point {};
+    point.x = x.real_value().value();
+    point.y = y.real_value().value();
+    return point;
+}
+
+bool imgui_begin_plot(ps::string_type const& str) {
+    return ImPlot::BeginPlot(str.representation().c_str());
+}
+
+int imgui_plot_scatter(ps::string_type const& str, ps::list_type const& data) {
+    ImPlot::PlotScatterG(str.representation().c_str(), list_data_getter, (void*) &data, data.size());
+    return 0;
+}
+
+int imgui_plot_line(ps::string_type const& str, ps::list_type const& data) {
+    ImPlot::PlotLineG(str.representation().c_str(), list_data_getter, (void*) &data, data.size());
+    return 0;
+}
+
+int plot_next_style(int r, int g, int b) {
+    ImPlot::SetNextFillStyle(ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f));
+    return 0;
+}
+
+int plot_next_marker_style(float size, int r, int g, int b) {
+    auto color = ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
+    ImPlot::SetNextMarkerStyle(IMPLOT_AUTO, size, color, IMPLOT_AUTO, color);
+    return 0;
+}
+
+int imgui_end_plot() {
+    ImPlot::EndPlot();
+    return 0;
+}
+
 }
 
 int main() {
@@ -72,6 +122,7 @@ int main() {
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -80,15 +131,25 @@ int main() {
     constexpr size_t memsize = 1024 * 1024;
     ps::context ctx(memsize);
 
-    ps::script main = ps::script(read_file("ps/main.ps"), ctx);
+    ps::script build_ui = ps::script(read_file("ps/ui_frame.ps"), ctx);
+    ps::script perceptron = ps::script(read_file("ps/perceptron.ps"), ctx);
 
     extern_library lib {};
     lib.add_function(ctx, "imgui.begin", &ps_bindings::imgui_begin);
     lib.add_function(ctx, "imgui.end", &ps_bindings::imgui_end);
+    lib.add_function(ctx, "imgui.button", &ps_bindings::imgui_button);
+    lib.add_function(ctx, "imgui.begin_plot", &ps_bindings::imgui_begin_plot);
+    lib.add_function(ctx, "imgui.plot_scatter", &ps_bindings::imgui_plot_scatter);
+    lib.add_function(ctx, "imgui.plot_line", &ps_bindings::imgui_plot_line);
+    lib.add_function(ctx, "imgui.end_plot", &ps_bindings::imgui_end_plot);
+    lib.add_function(ctx, "imgui.next_plot_style", &ps_bindings::plot_next_style);
+    lib.add_function(ctx, "imgui.next_plot_marker_style", &ps_bindings::plot_next_marker_style);
 
     ps::execution_context exec {};
     exec.module_paths.emplace_back("ps/");
     exec.externs = &lib;
+
+    ctx.execute(perceptron, exec);
 
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -97,7 +158,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ctx.execute(main, exec);
+        ctx.execute(build_ui, exec);
 
         ImGui::Render();
         int display_w, display_h;
@@ -109,6 +170,9 @@ int main() {
 
         glfwSwapBuffers(window);
     }
+
+    ImPlot::DestroyContext();
+    ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
     glfwTerminate();

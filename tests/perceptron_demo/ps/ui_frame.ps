@@ -1,0 +1,55 @@
+import imgui;
+import std.io;
+
+fn create_plot_data(input: list, group: float) -> list {
+    let n = input.size();
+    let result = [];
+    for (let i = 0; i < n; i += 1) {
+        let point = input[i];
+        if (point->output == group) {
+            let p_in = point->input;
+            result.append(imgui.PlotPoint{ p_in[0], p_in[1] });
+        }
+    }
+    return result;
+}
+
+let red_group = create_plot_data(training, 1.0);
+let blue_group = create_plot_data(training, -1.0);
+
+if (imgui.begin("Perceptron data plot")) {
+    if (imgui.begin_plot("Training data")) {
+        // Plot training data points
+        let size = 3.0;
+        imgui.next_plot_marker_style(size, 255, 0, 0);
+        imgui.plot_scatter("red", red_group);
+        imgui.next_plot_marker_style(size, 0, 0, 255);
+        imgui.plot_scatter("blue", blue_group);
+        // Plot expected separation as a black line, and AI result as a green line.
+        let expected = [imgui.PlotPoint{0.77, -1.0}, imgui.PlotPoint{-0.55, 1.0}];
+        imgui.next_plot_style(0, 0, 0);
+        imgui.plot_line("expected", expected);
+        imgui.next_plot_style(0, 255, 0);
+
+        let xA = 1.0;
+        let xB = -1.0;
+        let yA = 0.0;
+        let yB = 0.0;
+        let weights = state->weights;
+        if (weights[1] != 0.0) {
+            yA = (- weights[0] * xA - state->bias) / weights[1];
+            yB = (- weights[0] * xB - state->bias) / weights[1];
+        } else {
+            xA = - state->bias / weights[0];
+            xB = - state->bias / weights[0];
+
+            yA = 1.0;
+            yB = -1.0;
+        }
+        let ai_result = [imgui.PlotPoint{xA, yA}, imgui.PlotPoint{xB, yB}];
+        imgui.plot_line("ai training result", ai_result);
+        imgui.end_plot();
+    }
+}
+
+imgui.end();

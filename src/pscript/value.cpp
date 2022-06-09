@@ -119,6 +119,10 @@ ps::value& struct_type::access(std::string const& name) {
     return members.at(name);
 }
 
+ps::value const& struct_type::access(std::string const& name) const {
+    return members.at(name);
+}
+
 std::ostream& operator<<(std::ostream& out, struct_type const& s) {
     return out << s.to_string();
 }

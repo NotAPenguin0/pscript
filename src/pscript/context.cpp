@@ -266,7 +266,7 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
     if (auto old = variables.find(name); old != variables.end()) {
         // Variable already exists, so shadow it with a new type by assigning a new value to it.
         // We first need to free the old memory
-        memory().free(old->second.value().pointer());
+        old->second.value().on_destroy();
         old->second.value() = std::move(initializer);
         return old->second;
     } else {
@@ -911,6 +911,10 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope)
 
             if (node_is_type(child.get(), "unary_operator")) {
                 peg::Ast const* operand = find_child_with_type(node, "operand");
+                if (!operand) operand = find_child_with_type(node, "access_expression");
+                if (!operand) operand = find_child_with_type(node, "call_expression");
+                if (!operand) operand = find_child_with_type(node, "index_expression");
+                if (!operand) operand = find_child_with_type(node, "constructor_expression");
                 std::string op = child->token_to_string();
                 if (op == "-") {
                     return -evaluate_expression(operand, scope);

@@ -14,9 +14,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(imgui glfw)
 
 add_library(ps-glad STATIC external/glad330/src/glad.c)
-target_include_directories(ps-glad PUBLIC external/glad330/include)
+target_include_directories(ps-glad PUBLIC external/glad330/include external/implot/)
 
-add_executable(pscript-demo main.cpp external/imgui_impl_opengl3.cpp external/imgui_impl_glfw.cpp)
+add_executable(pscript-demo main.cpp external/imgui_impl_opengl3.cpp external/imgui_impl_glfw.cpp external/implot/implot.cpp external/implot/implot_items.cpp)
 
 target_link_libraries(pscript-demo PRIVATE plib imgui ps-glad glfw)
 target_include_directories(pscript-demo PRIVATE {imgui_SOURCE_DIR}/include)

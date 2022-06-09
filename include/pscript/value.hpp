@@ -438,6 +438,7 @@ public:
     std::string to_string() const;
 
     ps::value& access(std::string const& name);
+    ps::value const& access(std::string const& name) const;
 
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 
@@ -526,6 +527,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream& out, value const& v);
 
+    void on_destroy();
+
 private:
     mutable ps::memory_pool* memory = nullptr;
 
@@ -533,8 +536,6 @@ private:
     ps::pointer ptr = ps::null_pointer;
     type tpe{};
     std::shared_ptr<int> refcount = nullptr;
-
-    void on_destroy();
 };
 
 template<typename F>
