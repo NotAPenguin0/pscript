@@ -497,6 +497,9 @@ public:
     static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
     static ps::value from(ps::memory_pool& memory, ps::struct_type const& v);
 
+    // construct a value as a reference, regardless of its type.
+    static ps::value ref(ps::value const& rhs);
+
     ps::pointer pointer();
     type get_type() const;
 
@@ -529,13 +532,17 @@ public:
 
     void on_destroy();
 
+    inline bool is_reference() const { return is_ref; }
+
 private:
     mutable ps::memory_pool* memory = nullptr;
 
     // Pointer to allocated memory for this value.
     ps::pointer ptr = ps::null_pointer;
     type tpe{};
+    // if is_ref is true, but refcount is null, this is an uncounted reference and shouldn't be cleaned up;
     std::shared_ptr<int> refcount = nullptr;
+    bool is_ref = false;
 };
 
 template<typename F>

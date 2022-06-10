@@ -135,12 +135,13 @@ static bool is_reference_type(ps::type type) {
 value::value(value const& rhs) {
     tpe = rhs.tpe;
     memory = rhs.memory;
+    is_ref = rhs.is_ref;
 
     if (!is_null()) {
-        if (is_reference_type(tpe)) {
+        if (rhs.is_reference() || is_reference_type(tpe)) {
             ptr = rhs.ptr;
             refcount = rhs.refcount;
-            (*refcount)++;
+            if (refcount) (*refcount)++;
         } else {
             visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
                 ptr = memory->allocate<T>();
@@ -156,12 +157,13 @@ value& value::operator=(value const& rhs) {
         // destroy old value
         on_destroy();
 
+        is_ref = rhs.is_ref;
         tpe = rhs.tpe;
         memory = rhs.memory;
-        if (is_reference_type(tpe)) {
+        if (rhs.is_reference() || is_reference_type(tpe)) {
             ptr = rhs.ptr;
             refcount = rhs.refcount;
-            (*refcount)++;
+            if (refcount) (*refcount)++;
         } else {
             visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
                 ptr = memory->allocate<T>();
@@ -173,20 +175,22 @@ value& value::operator=(value const& rhs) {
     return *this;
 }
 
-value::value(ps::value&& rhs)  noexcept {
+value::value(ps::value&& rhs) noexcept {
     if (&rhs != this) {
         ptr = rhs.ptr;
         tpe = rhs.tpe;
         memory = rhs.memory;
         refcount = rhs.refcount;
+        is_ref = rhs.is_ref;
         rhs.ptr = ps::null_pointer;
         rhs.tpe = {};
         rhs.memory = nullptr;
         rhs.refcount = nullptr;
+        rhs.is_ref = false;
     }
 }
 
-ps::value& value::operator=(ps::value&& rhs)  noexcept {
+ps::value& value::operator=(ps::value&& rhs) noexcept {
     if (&rhs != this) {
         on_destroy();
 
@@ -194,10 +198,12 @@ ps::value& value::operator=(ps::value&& rhs)  noexcept {
         tpe = rhs.tpe;
         memory = rhs.memory;
         refcount = rhs.refcount;
+        is_ref = rhs.is_ref;
         rhs.ptr = ps::null_pointer;
         rhs.tpe = {};
         rhs.memory = nullptr;
         rhs.refcount = nullptr;
+        rhs.is_ref = false;
     }
     return *this;
 }
@@ -205,13 +211,15 @@ ps::value& value::operator=(ps::value&& rhs)  noexcept {
 void value::on_destroy() {
     if (ptr != ps::null_pointer) {
         // call object destructor
-        if (is_reference_type(tpe)) {
-            (*refcount)--;
-            if (*refcount == 0) {
-                visit_value(*this,[] <typename T> (T& val) {
-                    val.~T();
-                });
-                memory->free(ptr);
+        if (is_reference()) {
+            if (refcount) {
+                (*refcount)--;
+                if (*refcount == 0) {
+                    visit_value(*this, []<typename T>(T& val) {
+                        val.~T();
+                    });
+                    memory->free(ptr);
+                }
             }
         }
         else {
@@ -280,6 +288,7 @@ ps::value value::from(ps::memory_pool& memory, ps::list_type const& v) {
     val.tpe = type::list;
     val.ptr = memory.allocate<ps::list>();
     val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
+    val.is_ref = true;
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::list>(val.ptr) = v;
     return val;
@@ -291,6 +300,7 @@ ps::value value::from(ps::memory_pool& memory, ps::string_type const& v) {
     val.tpe = type::str;
     val.ptr = memory.allocate<ps::str>();
     val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
+    val.is_ref = true;
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::str>(val.ptr) = v;
     return val;
@@ -302,8 +312,19 @@ ps::value value::from(ps::memory_pool& memory, ps::struct_type const& v) {
     val.tpe = type::structure;
     val.ptr = memory.allocate<ps::structure>();
     val.refcount = std::make_shared<int>(1); // initialize refcounter for reference types
+    val.is_ref = true;
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::structure>(val.ptr) = v;
+    return val;
+}
+
+ps::value value::ref(ps::value const& rhs) {
+    ps::value val {};
+    val.refcount = rhs.refcount;
+    val.tpe = rhs.tpe;
+    val.memory = rhs.memory;
+    val.ptr = rhs.ptr;
+    val.is_ref = true;
     return val;
 }
 

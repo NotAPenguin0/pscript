@@ -98,6 +98,16 @@ int plot_next_marker_style(float size, int r, int g, int b) {
     return 0;
 }
 
+int imgui_same_line() {
+    ImGui::SameLine();
+    return 0;
+}
+
+// data_ref is of type imgui.Reference
+bool imgui_input_float(ps::string_type const& id, float& data_ref) {
+    return ImGui::InputFloat(id.representation().c_str(), &data_ref);
+}
+
 int imgui_end_plot() {
     ImPlot::EndPlot();
     return 0;
@@ -145,6 +155,8 @@ int main() {
     lib.add_function(ctx, "imgui.end_plot", &ps_bindings::imgui_end_plot);
     lib.add_function(ctx, "imgui.next_plot_style", &ps_bindings::plot_next_style);
     lib.add_function(ctx, "imgui.next_plot_marker_style", &ps_bindings::plot_next_marker_style);
+    lib.add_function(ctx, "imgui.same_line", &ps_bindings::imgui_same_line);
+    lib.add_function(ctx, "imgui.input_float", &ps_bindings::imgui_input_float);
 
     ps::execution_context exec {};
     exec.module_paths.emplace_back("ps/");

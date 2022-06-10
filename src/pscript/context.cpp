@@ -68,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> \[\]-]*
+any <- [a-zA-Z0-9.,:;&_+*/=?!(){}<> \[\]-]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -113,7 +113,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print' / '__readln' / '__time'
+builtin_function <- '__print' / '__readln' / '__time' / '__ref'
 
 # ================= structs =================
 
@@ -310,7 +310,6 @@ void context::execute(ps::script const& script, ps::execution_context exec) {
 }
 
 ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {
-    // TODO: Rework return value system to put return value in call stack instead!
     if (node_is_type(node, "declaration")) {
         evaluate_declaration(node, scope);
     }
@@ -539,10 +538,14 @@ void context::evaluate_import(peg::Ast const* node) {
     execute(ast, &local_scope, namespace_prefix);
 }
 
-ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope, bool ref) {
     assert(node_is_type(node, "operand"));
 
     std::string str_repr = node->token_to_string();
+
+    if (str_repr == "true") return ps::value::from(memory(), true);
+    else if (str_repr == "false") return ps::value::from(memory(), false);
+
     // integer or floating point literal
     if (std::isdigit(str_repr[0])) {
         if (str_repr.find('.') != std::string::npos) {
@@ -568,7 +571,9 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope) {
     }
 
     // identifier
-    return get_variable_value(str_repr, scope);
+    if (ref) {
+        return ps::value::ref(get_variable_value(str_repr, scope));
+    } else return get_variable_value(str_repr, scope);
 }
 
 ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope) {
@@ -621,14 +626,14 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
 }
 
-std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node, block_scope* scope) {
+std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref) {
     peg::Ast const* list = find_child_with_type(call_node, "argument_list");
     if (!list) return {};
     std::vector<ps::value> values {};
     values.reserve(list->nodes.size());
     for (auto const& child :  list->nodes) {
         if (node_is_type(child.get(), "argument")) {
-            values.push_back(evaluate_expression(child.get(), scope));
+            values.push_back(evaluate_expression(child.get(), scope, ref));
         }
     }
     return values;
@@ -771,6 +776,10 @@ ps::value context::evaluate_string_member_function(std::string_view name, ps::va
 }
 
 ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
+    if (name == "__ref") {
+        auto arguments = evaluate_argument_list(node, scope, true);
+        return arguments[0]; // calling evaluate_argument_list with ref = true gives us a reference
+    }
     auto arguments = evaluate_argument_list(node, scope);
     // builtin function: print
     // TODO: print improvements (format string)
@@ -883,10 +892,10 @@ ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
     return *cur_val;
 }
 
-ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref) {
     // base case, an operand is a simple value.
     if (node_is_type(node, "operand")) {
-        return evaluate_operand(node, scope);
+        return evaluate_operand(node, scope, ref);
     }
 
     if (node_is_type(node, "index_expression")) {

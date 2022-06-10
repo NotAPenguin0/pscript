@@ -48,6 +48,34 @@ if (imgui.begin("Perceptron data plot")) {
         imgui.plot_line("ai training result", ai_result);
         imgui.end_plot();
     }
+
+    if (imgui.button("Complete training")) {
+        while(complete == false) {
+            complete = step();
+        }
+    }
+
+    if (imgui.button("Train 1 step")) {
+        if (complete == true) {
+            std.io.print("Training complete");
+        } else {
+            std.io.print("Training one step");
+            complete = step();
+        }
+    }
+
+    // TODO: current ref syntax: __ref(x), is bad. Improve with new syntax like &x.
+
+    imgui.input_float("x", __ref(input_x));
+    imgui.input_float("y", __ref(input_y));
+    imgui.input_float("label", __ref(input_label));
+    if (imgui.button("Add point and reset training")) {
+
+    }
+
+    if (imgui.button("Add point and classify")) {
+
+    }
 }
 
 imgui.end();

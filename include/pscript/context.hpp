@@ -164,7 +164,7 @@ private:
 
     void evaluate_import(peg::Ast const* node);
 
-    std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope);
+    std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref = false);
 
     std::string parse_namespace(peg::Ast const* node);
 
@@ -181,9 +181,9 @@ private:
     ps::value& index_list(peg::Ast const* node, block_scope* scope);
     ps::value& access_member(peg::Ast const* node, block_scope* scope);
 
-    ps::value evaluate_operand(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_operand(peg::Ast const* node, block_scope* scope, bool ref = false);
     ps::value evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope);
-    ps::value evaluate_expression(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref = false);
     ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
 };

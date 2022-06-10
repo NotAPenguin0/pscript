@@ -100,41 +100,54 @@ let threshold = 0.0;
 let max_iterations = 10;
 let hits = 0;
 let it = 0;
-while(it < max_iterations && hits != training.size()) {
-    hits = 0;
 
-    for (let t = 0; t < training.size(); t += 1) {
-        let output = sample_output(state, training[t]);
-        let y = 0.0;
+let t = 0;
 
-        if (output > threshold) {
-            y = 1.0;
-        } else {
-            y = -1.0;
-        }
+let complete = false;
 
-        // update weights if output does not match expected output
-        if (y == training[t]->output) {
-            hits += 1;
-        } else {
-            let weights = state->weights;
-            let n = weights.size();
-            for (let j = 0; j < n; j += 1) {
-                weights[j] = weights[j] + (state->learning_rate * training[t]->output * training[t]->input[j]);
-            }
-            state->bias = state->bias + state->learning_rate * training[t]->output;
-            let fmt = "Error - updating weight to {}";
-            std.io.print(fmt.format(weights));
-        }
+fn step() -> bool {
+    if (it >= max_iterations) return true;
+    if (hits >= training.size()) return true;
+
+    let fmt = "Training iteration: {}, sample {}";
+    std.io.print(fmt.format(it, t));
+
+    let output = sample_output(state, training[t]);
+    let y = 0.0;
+
+    if (output > threshold) {
+        y = 1.0;
+    } else {
+        y = -1.0;
     }
 
-    let fmt = "Iteration {}: Correct: {} / {}";
-    std.io.print(fmt.format(it, hits, training.size()));
-    it += 1;
+    // update weights if output does not match expected output
+    if (y == training[t]->output) {
+        hits += 1;
+    } else {
+        let weights = state->weights;
+        let n = weights.size();
+        for (let j = 0; j < n; j += 1) {
+            weights[j] = weights[j] + (state->learning_rate * training[t]->output * training[t]->input[j]);
+        }
+        state->bias = state->bias + state->learning_rate * training[t]->output;
+        let fmt = "Error - updating weight to {}";
+        std.io.print(fmt.format(weights));
+    }
+
+    if (hits >= training.size()) return true;
+
+    t += 1;
+    if (t >= training.size()) {
+        it += 1;
+        t = 0;
+        hits = 0;
+    }
+
+    if (it >= max_iterations) return true;
+    return false; // TODO: safeguard against no return value
 }
 
-let fmt = "Training complete in {} iterations";
-std.io.print(fmt.format(it));
-
-// Create output for UI script to use
-
+let input_x = 0.0;
+let input_y = 0.0;
+let input_label = 0.0;
