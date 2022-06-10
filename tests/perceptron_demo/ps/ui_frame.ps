@@ -7,8 +7,7 @@ fn create_plot_data(input: list, group: float) -> list {
     for (let i = 0; i < n; i += 1) {
         let point = input[i];
         if (point->output == group) {
-            let p_in = point->input;
-            result.append(imgui.PlotPoint{ p_in[0], p_in[1] });
+            result.append(imgui.PlotPoint{ point->input[0], point->input[1] });
         }
     }
     return result;
@@ -35,13 +34,12 @@ if (imgui.begin("Perceptron data plot")) {
         let xB = -1.0;
         let yA = 0.0;
         let yB = 0.0;
-        let weights = state->weights;
-        if (weights[1] != 0.0) {
-            yA = (- weights[0] * xA - state->bias) / weights[1];
-            yB = (- weights[0] * xB - state->bias) / weights[1];
+        if (state->weights[1] != 0.0) {
+            yA = (- state->weights[0] * xA - state->bias) / state->weights[1];
+            yB = (- state->weights[0] * xB - state->bias) / state->weights[1];
         } else {
-            xA = - state->bias / weights[0];
-            xB = - state->bias / weights[0];
+            xA = - state->bias / state->weights[0];
+            xB = - state->bias / state->weights[0];
 
             yA = 1.0;
             yB = -1.0;

@@ -575,7 +575,7 @@ TEST_CASE("stdlib") {
 }
 
 TEST_CASE("structs") {
-    constexpr std::size_t memsize = 512;
+    constexpr std::size_t memsize = 1024;
     ps::context ctx(memsize);
 
     SECTION("declaration") {
@@ -620,6 +620,25 @@ TEST_CASE("structs") {
             // std.io.print(m->a);
             m->b = 4.0;
             // std.io.print(m->b);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("complex member access") {
+        std::string source = R"(
+            import std.io;
+
+            struct MyStruct {
+                a: int = 5;
+                b: float = 6.6;
+                c: list = [1, 2, 3];
+            };
+
+            let l = [ MyStruct { 1 }, MyStruct { 2 } ];
+            std.io.print(l[1]->a);
+            std.io.print(l[1]->c[2]); // should print 3
         )";
 
         ps::script script(source, ctx);

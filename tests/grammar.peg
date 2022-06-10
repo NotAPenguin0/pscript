@@ -185,7 +185,7 @@ argument <- expression
 index_expression <- identifier list_open expression list_close
 
 # ----- member access expression -----
-access_expression <- (identifier arrow)+ identifier space
+access_expression <- (identifier arrow)+ (index_expression / identifier) space
 
 
 # ================= control sequences =================

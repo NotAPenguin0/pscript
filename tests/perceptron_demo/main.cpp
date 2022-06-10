@@ -105,6 +105,7 @@ int imgui_end_plot() {
 
 }
 
+
 int main() {
     if (!glfwInit()) return -1;
 

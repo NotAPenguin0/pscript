@@ -68,7 +68,7 @@ star <- '*'
 comma <- ','
 semicolon <- ';'
 # todo: find better 'any' than this.
-any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> -]*
+any <- [a-zA-Z0-9.,:;_+*/=?!(){}<> \[\]-]*
 # our language ignores whitespace
 %whitespace <- [ \n\t\r]*
 
@@ -199,7 +199,7 @@ argument <- expression
 index_expression <- identifier list_open expression list_close
 
 # ----- member access expression -----
-access_expression <- (identifier arrow)+ identifier space
+access_expression <- ((index_expression / identifier) arrow)+ (index_expression / identifier) space
 
 
 # ================= control sequences =================
@@ -854,14 +854,31 @@ ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
 }
 
 ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    ps::variable& var = get_variable(identifier->token_to_string(), scope);
-    ps::value* cur_val = &var.value();
+    peg::Ast const* first = node->nodes[0].get();
+    ps::value* cur_val = nullptr;
+    if (node_is_type(first, "identifier")) {
+        ps::variable& var = get_variable(first->token_to_string(), scope);
+        cur_val = &var.value();
+    } else if (node_is_type(first, "index_expression")) {
+        cur_val = &index_list(first, scope);
+    }
+
     for (auto const& child : node->nodes) {
-        if (child.get() == identifier) continue; // skip initial node
-        if (!node_is_type(child.get(), "identifier")) continue; // only process identifiers
-        auto& as_struct = static_cast<ps::structure&>(*cur_val);
-        cur_val = &as_struct->access(child->token_to_string());
+        if (child.get() == first) continue; // skip initial node
+        if (node_is_type(child.get(), "identifier")) {
+            auto& as_struct = static_cast<ps::structure&>(*cur_val);
+            cur_val = &as_struct->access(child->token_to_string());
+        } else if (node_is_type(child.get(), "index_expression")) {
+            peg::Ast const* identifier = find_child_with_type(child.get(), "identifier");
+            auto& as_struct = static_cast<ps::structure&>(*cur_val);
+            auto& list = as_struct->access(identifier->token_to_string());
+            auto& as_list = static_cast<ps::list&>(list);
+
+            peg::Ast const* index_expr = find_child_with_type(child.get(), "expression");
+            ps::value index_val = evaluate_expression(index_expr, scope);
+            auto& index = static_cast<ps::integer&>(index_val);
+            cur_val = &as_list->get(index.value());
+        }
     }
     return *cur_val;
 }
