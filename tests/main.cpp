@@ -91,7 +91,7 @@ static bool output_equal(ps::execution_context& exec, std::string const& expecte
     return dynamic_cast<std::ostringstream*>(exec.out)->str() == expected;
 }
 
-class extern_library : public ps::extern_function_library {
+class extern_library : public ps::extern_library {
 public:
     template<typename C>
     void add_function(ps::context& ctx, std::string const& name, C&& callable) {
@@ -100,8 +100,16 @@ public:
         })});
     }
 
+    void add_variable(std::string const& name, void* ptr) {
+        variables.insert({name, ptr});
+    }
+
     plib::erased_function<ps::value>* get_function(std::string const& name) override {
         return functions.at(name);
+    }
+
+    void* get_variable(std::string const& name) override {
+        return variables.at(name);
     }
 
     ~extern_library() {
@@ -113,6 +121,7 @@ public:
 
 private:
     std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
+    std::unordered_map<std::string, void*> variables;
 };
 
 TEST_CASE("pscript context", "[context]") {
@@ -670,6 +679,65 @@ TEST_CASE("external functions") {
 
     ps::script script(source, ctx);
     ctx.execute(script, exec);
+}
+
+// external type must be integer
+// todo: possibly add specializations for void return type to concrete_function
+int print_int(ps::external const& ext) {
+    std::cout << static_cast<int const&>(ext.value()) << std::endl;
+    return 0;
+}
+
+struct external_struct {
+    int x;
+};
+
+int print_ext_struct(ps::external const& ext) {
+    std::cout << static_cast<external_struct const&>(ext.value()).x << std::endl;
+    return 0;
+}
+
+TEST_CASE("external types") {
+    constexpr size_t memsize = 1024 * 1024;
+    ps::context ctx(memsize);
+
+    int my_integer = 10;
+    external_struct my_struct { .x = 20 };
+
+    extern_library lib {};
+    lib.add_variable("my_integer", &my_integer);
+    lib.add_variable("my_struct", &my_struct);
+    lib.add_function(ctx, "print_int", &print_int);
+    lib.add_function(ctx, "print_ext_struct", &print_ext_struct);
+
+    ps::execution_context exec {};
+    exec.externs = &lib;
+
+    SECTION("simple") {
+        std::string source = R"(
+            extern fn print_int(x: int) -> void;
+            extern let my_integer -> int;
+
+            print_int(my_integer);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    // note that modifying external types is not properly supported yet (TODO?)
+    SECTION("structs") {
+        std::string source = R"(
+            extern fn print_ext_struct(x: any) -> void;
+            extern let my_struct -> any;
+
+            __print(my_struct);
+            print_ext_struct(my_struct);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
 }
 
 TEST_CASE("perceptron") {

@@ -16,6 +16,7 @@ class value;
 
 enum class type {
     null,
+    any,
     integer,
     uint,
     // float
@@ -23,7 +24,8 @@ enum class type {
     boolean,
     str,
     list,
-    structure
+    structure,
+    external // stores an additional type member for its contained type.
 };
 
 template<typename T>
@@ -451,6 +453,40 @@ private:
     std::unordered_map<std::string, ps::value> members;
 };
 
+struct external_type {
+public:
+    external_type() = default;
+    external_type(void* pointer, ps::type type);
+    external_type(external_type const&) = default;
+    external_type(external_type&&) noexcept = default;
+    external_type& operator=(external_type const&) = default;
+    external_type& operator=(external_type&&) noexcept = default;
+
+    friend std::ostream& operator<<(std::ostream& out, external_type const& str);
+
+    template<typename T>
+    explicit operator T&()  {
+        return *reinterpret_cast<T*>(ptr);
+    }
+
+    template<typename T>
+    explicit operator T const&() const {
+        return *reinterpret_cast<T const*>(ptr);
+    }
+
+    inline ps::type stored_type() const {
+        return type;
+    }
+
+    inline void* pointer() const {
+        return ptr;
+    }
+
+private:
+    void* ptr;
+    ps::type type;
+};
+
 using integer = arithmetic_type<int>;
 using uint = arithmetic_type<unsigned int>;
 using real = arithmetic_type<float>;
@@ -458,13 +494,14 @@ using boolean = eq_comparable<bool>;
 using list = value_storage<list_type>;
 using str = eq_comparable<string_type>;
 using structure = value_storage<struct_type>;
+using external = value_storage<external_type>;
 
 inline bool operator&&(boolean const& lhs, boolean const &rhs) {
     return lhs.value() && rhs.value();
 }
 
 inline bool operator||(boolean const& lhs, boolean const &rhs) {
-    return lhs.value() && rhs.value();
+    return lhs.value() || rhs.value();
 }
 
 // string concatenation
@@ -496,6 +533,7 @@ public:
     static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
     static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
     static ps::value from(ps::memory_pool& memory, ps::struct_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::external_type const& v);
 
     // construct a value as a reference, regardless of its type.
     static ps::value ref(ps::value const& rhs);
@@ -571,6 +609,9 @@ void visit_value(value& v, F&& callable) {
         case type::structure:
             callable(static_cast<ps::structure&>(v));
             break;
+        case type::external:
+            callable(static_cast<ps::external&>(v));
+            break;
         default:
             break;
     }
@@ -601,6 +642,9 @@ void visit_value(value const& v, F&& callable) {
             break;
         case type::structure:
             callable(static_cast<ps::structure const&>(v));
+            break;
+        case type::external:
+            callable(static_cast<ps::external const&>(v));
             break;
         default:
             break;

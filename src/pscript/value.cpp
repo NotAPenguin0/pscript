@@ -72,6 +72,11 @@ void try_push_arg<ps::struct_type>(arg_store& dyn, ps::struct_type const& value)
     dyn.push_back(value.to_string());
 }
 
+template<>
+void try_push_arg<ps::external_type>(arg_store& dyn, ps::external_type const& value) {
+    dyn.push_back(value.pointer());
+}
+
 static std::string format_vector(std::string_view format, std::vector<ps::value> const& args) {
     arg_store fmt_args {};
 
@@ -125,6 +130,15 @@ ps::value const& struct_type::access(std::string const& name) const {
 
 std::ostream& operator<<(std::ostream& out, struct_type const& s) {
     return out << s.to_string();
+}
+
+external_type::external_type(void* pointer, ps::type type) {
+    ptr = pointer;
+    this->type = type;
+}
+
+std::ostream& operator<<(std::ostream& out, external_type const& e) {
+    return out << "[external object at " << e.ptr << "]";
 }
 
 static bool is_reference_type(ps::type type) {
@@ -315,6 +329,16 @@ ps::value value::from(ps::memory_pool& memory, ps::struct_type const& v) {
     val.is_ref = true;
     if (val.ptr == ps::null_pointer) throw std::bad_alloc();
     memory.get<ps::structure>(val.ptr) = v;
+    return val;
+}
+
+ps::value value::from(ps::memory_pool& memory, ps::external_type const& v) {
+    ps::value val {};
+    val.memory = &memory;
+    val.tpe = type::external;
+    val.ptr = memory.allocate<ps::external>();
+    if (val.ptr == ps::null_pointer) throw std::bad_alloc();
+    memory.get<ps::external>(val.ptr) = v;
     return val;
 }
 

@@ -32,7 +32,7 @@ script <- content
 # - namespace declarations
 # - functions - Starts a function declaration.
 # - structs - Starts a struct declaration
-content <- (comment / element / namespace_decl / function / struct)* { no_ast_opt }
+content <- (extern_var / comment / element / namespace_decl / function / struct)* { no_ast_opt }
 
 # ================= basic syntactical symbols =================
 
@@ -83,6 +83,10 @@ builtin_type <- 'uint' / 'int' / 'float' / 'str' / 'list' / 'any'
 # ================= namespaces =================
 
 namespace_decl <- 'namespace ' identifier space brace_open content brace_close
+
+# ================= external variables =================
+
+extern_var <- 'extern let ' identifier space arrow typename semicolon
 
 # ================= functions =================
 

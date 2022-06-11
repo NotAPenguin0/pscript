@@ -19,7 +19,7 @@ std::string read_file(const char* filename) {
 }
 
 
-class extern_library : public ps::extern_function_library {
+class extern_library : public ps::extern_library {
 public:
     template<typename C>
     void add_function(ps::context& ctx, std::string const& name, C&& callable) {
@@ -28,8 +28,16 @@ public:
         })});
     }
 
+    void add_variable(std::string const& name, void* ptr) {
+        variables.insert({name, ptr});
+    }
+
     plib::erased_function<ps::value>* get_function(std::string const& name) override {
         return functions.at(name);
+    }
+
+    void* get_variable(std::string const& name) override {
+        return variables.at(name);
     }
 
     ~extern_library() {
@@ -41,6 +49,7 @@ public:
 
 private:
     std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
+    std::unordered_map<std::string, void*> variables;
 };
 
 namespace ps_bindings {

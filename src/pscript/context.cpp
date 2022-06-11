@@ -46,7 +46,7 @@ script <- content
 # - namespace declarations
 # - functions - Starts a function declaration.
 # - structs - Starts a struct declaration
-content <- (comment / element / namespace_decl / function / struct)* { no_ast_opt }
+content <- (extern_var / comment / element / namespace_decl / function / struct)* { no_ast_opt }
 
 # ================= basic syntactical symbols =================
 
@@ -97,6 +97,10 @@ builtin_type <- 'uint' / 'int' / 'float' / 'str' / 'list' / 'any'
 # ================= namespaces =================
 
 namespace_decl <- 'namespace ' identifier space brace_open content brace_close
+
+# ================= external variables =================
+
+extern_var <- 'extern let ' identifier space arrow typename semicolon
 
 # ================= functions =================
 
@@ -339,6 +343,10 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         evaluate_import(node);
     }
 
+    if (node_is_type(node, "extern_var")) {
+        evaluate_extern_variable(node, namespace_prefix);
+    }
+
     if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
         for (auto const& child : node->nodes) {
             execute(child.get(), scope, namespace_prefix);
@@ -483,6 +491,35 @@ void context::evaluate_struct_definition(peg::Ast const* node, std::string const
     std::string name = namespace_prefix + identifier->token_to_string();
     auto it = structs.insert({ name, std::move(info) });
     it.first->second.name = it.first->first;
+}
+
+ps::type context::evaluate_type(peg::Ast const* node) {
+    peg::Ast const* builtin = find_child_with_type(node, "builtin_type");
+    if (builtin) {
+        std::string const& name = builtin->token_to_string();
+        if (name == "int") return ps::type::integer;
+        if (name == "float") return ps::type::real;
+        if (name == "any") return ps::type::any;
+        if (name == "list") return ps::type::list;
+        if (name == "str") return ps::type::str;
+        if (name == "uint") return ps::type::uint;
+        if (name == "bool") return ps::type::boolean;
+    }
+    // any other type is probably a struct (lole, should check this more thoroughly).
+    else return ps::type::structure;
+}
+
+void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
+    if (!exec_ctx.externs) throw std::runtime_error("no extern library bound");
+
+    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    peg::Ast const* type = find_child_with_type(node, "typename");
+
+    std::string name = namespace_prefix + identifier->token_to_string();
+    void* external_ptr = exec_ctx.externs->get_variable(name);
+    ps::type stored_type = evaluate_type(type);
+    ps::value val = ps::value::from(memory(), ps::external_type { external_ptr, stored_type });
+    auto& _ = create_variable(name, std::move(val));
 }
 
 static std::string read_script(std::string const& filename) {

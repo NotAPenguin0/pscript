@@ -24,15 +24,16 @@ namespace ps {
 /**
  * @brief Interface class for external functions
  */
-class extern_function_library {
+class extern_library {
 public:
     virtual plib::erased_function<ps::value>* get_function(std::string const& name) = 0;
+    virtual void* get_variable(std::string const& name) = 0;
 };
 
 struct execution_context {
     std::istream* in = &std::cin;
     std::ostream* out = &std::cout;
-    extern_function_library* externs = nullptr;
+    extern_library* externs = nullptr;
     std::vector<std::string> module_paths = { "pscript-modules/" };
 };
 
@@ -158,9 +159,12 @@ private:
     // checks both name and original_name
     bool node_is_type(peg::Ast const* node, std::string_view type) const noexcept;
 
+    ps::type evaluate_type(peg::Ast const* node);
+
     void evaluate_declaration(peg::Ast const* node, block_scope* scope);
     void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
     void evaluate_struct_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
+    void evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix = "");
 
     void evaluate_import(peg::Ast const* node);
 
