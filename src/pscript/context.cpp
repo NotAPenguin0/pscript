@@ -52,7 +52,7 @@ content <- (extern_var / comment / element / namespace_decl / function / struct)
 
 space <- ' '*
 operator <- <  '&&' / '||' / '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
-unary_operator <- '-' / '++' / '--' / '!'
+unary_operator <- '&' / '--' / '-' / '++' / '!'
 assign <- '='
 colon <- ':'
 quote <- '"'
@@ -84,10 +84,11 @@ integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
 boolean <- < 'true' / 'false' >
+ampersand <- '&'
 
 # ================= typenames =================
 
-typename <- builtin_type / namespace_list? identifier { no_ast_opt }
+typename <- (builtin_type / namespace_list? identifier) ampersand? { no_ast_opt }
 # typenames can be prefixed by namespace qualifiers
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier
@@ -506,7 +507,7 @@ ps::type context::evaluate_type(peg::Ast const* node) {
         if (name == "bool") return ps::type::boolean;
     }
     // any other type is probably a struct (lole, should check this more thoroughly).
-    else return ps::type::structure;
+    return ps::type::structure;
 }
 
 void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
@@ -981,6 +982,14 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope,
                 std::string op = child->token_to_string();
                 if (op == "-") {
                     return -evaluate_expression(operand, scope);
+                } else if (op == "!") {
+                    return !evaluate_expression(operand, scope);
+                } else if (op == "--") {
+                    return --get_variable_value(operand->token_to_string());
+                } else if (op == "++") {
+                    return ++get_variable_value(operand->token_to_string());
+                } else if (op == "&") {
+                    return evaluate_expression(operand, scope, true);
                 }
             }
         }

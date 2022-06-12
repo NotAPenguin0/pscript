@@ -79,6 +79,7 @@ void memory_pool::verify_pointer_throw(ps::pointer ptr) const {
 
 [[nodiscard]] memory_pool::block* memory_pool::find_block(block* root, std::size_t block_size) {
     if (!root) return nullptr;
+    if (root->size < block_size) return nullptr;
     // If the current block has no buddies, there are two options
     if (root->free && root->left == nullptr && root->right == nullptr) {
         // a) The size matches, return the block if it is free

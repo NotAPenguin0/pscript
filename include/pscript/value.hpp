@@ -123,6 +123,11 @@ bool operator!=(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator!= not supported for this type");
 }
 
+template<typename T>
+bool operator!(value_storage<T> const& lhs) {
+    throw std::runtime_error("operator! not supported for this type");
+}
+
 template<typename T, typename U>
 T operator&&(value_storage<T> const& lhs, value_storage<U> const& rhs) {
     throw std::runtime_error("operator&& not supported for this type");
@@ -509,6 +514,10 @@ inline string_type operator+(str const& lhs, str const& rhs) {
     return string_type { lhs->representation() + rhs->representation() };
 }
 
+inline bool operator!(boolean const& lhs) {
+    return !lhs.value();
+}
+
 /**
  * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).
  */
@@ -686,6 +695,29 @@ inline ps::value operator-(ps::value const& lhs) {
     });
     return result;
 }
+
+inline ps::value operator!(ps::value const& lhs) {
+    ps::value result = ps::value::null();
+    visit_value(lhs, [&lhs, &result](auto const& lhs_val) {
+        result = value::from(lhs.get_memory(), !lhs_val);
+    });
+    return result;
+}
+
+inline ps::value& operator++(ps::value& lhs) {
+    visit_value(lhs, [&lhs](auto& lhs_val) {
+        lhs_val = lhs_val + ps::integer { 1 };
+    });
+    return lhs;
+}
+
+inline ps::value& operator--(ps::value& lhs) {
+    visit_value(lhs, [&lhs](auto& lhs_val) {
+        lhs_val = lhs_val - ps::integer { 1 };
+    });
+    return lhs;
+}
+
 
 GEN_VALUE_OP(+)
 GEN_VALUE_OP(-)

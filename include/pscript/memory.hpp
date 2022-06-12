@@ -106,7 +106,8 @@ private:
     std::unique_ptr<ps::byte[]> memory = nullptr;
     std::size_t mem_size = 0;
 
-    static constexpr inline std::size_t min_block_size = 8;
+    static constexpr inline std::size_t min_block_size = 16; // TODO check if this doesnt waste too much memory.
+    // TODO: possibly split into 2 allocators, one for small allocations with small max block size, one for larger allocations with bigger max block size.
 
     /**
      * @brief Represents a block in the buddy allocator.

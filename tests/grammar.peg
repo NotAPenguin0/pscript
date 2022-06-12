@@ -38,7 +38,7 @@ content <- (extern_var / comment / element / namespace_decl / function / struct)
 
 space <- ' '*
 operator <- <  '&&' / '||' / '%' / '&' / '<<' / '>>' / '^' / '+=' / '-=' / '*=' / '/=' / '<=' / '>=' / '==' / '!=' / '*' / '/' / '+' / '-' / '<' / '>' / '=' >
-unary_operator <- '-' / '++' / '--' / '!'
+unary_operator <- '&' / '--' / '-' / '++' / '!'
 assign <- '='
 colon <- ':'
 quote <- '"'
@@ -70,10 +70,11 @@ integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
 boolean <- < 'true' / 'false' >
+ampersand <- '&'
 
 # ================= typenames =================
 
-typename <- builtin_type / namespace_list? identifier { no_ast_opt }
+typename <- (builtin_type / namespace_list? identifier) ampersand? { no_ast_opt }
 # typenames can be prefixed by namespace qualifiers
 namespace_list <- (namespace '.')+ { no_ast_opt }
 namespace <- identifier

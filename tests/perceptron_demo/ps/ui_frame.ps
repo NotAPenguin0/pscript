@@ -66,15 +66,17 @@ if (imgui.begin("Perceptron data plot")) {
 
     // TODO: current ref syntax: __ref(x), is bad. Improve with new syntax like &x.
 
-    imgui.input_float("x", __ref(input_x));
-    imgui.input_float("y", __ref(input_y));
-    imgui.input_float("label", __ref(input_label));
+    imgui.input_float("x", &input_x);
+    imgui.input_float("y", &input_y);
+    imgui.input_float("label", &input_label);
     if (imgui.button("Add point and reset training")) {
-
-    }
-
-    if (imgui.button("Add point and classify")) {
-
+        training.append(Sample{[input_x, input_y], input_label});
+        complete = false;
+        t = 0;
+        hits = 0;
+        it = 0;
+        state->bias = 1.0;
+        state->weights = [0.0, 0.0];
     }
 }
 
