@@ -78,6 +78,11 @@ void memory_pool::verify_pointer_throw(ps::pointer ptr) const {
 }
 
 [[nodiscard]] memory_pool::block* memory_pool::find_block(block* root, std::size_t block_size) {
+    // If a block with the smallest size is requested, first try looking in the small block cache
+    if (block_size == min_block_size && num_small_blocks != 0) {
+        return small_block_cache[--num_small_blocks];
+    }
+
     if (!root) return nullptr;
     if (root->size < block_size) return nullptr;
     // If the current block has no buddies, there are two options
@@ -113,6 +118,10 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
         root->free = true;
         // Zero out block memory
         std::memset(decode_pointer(root->ptr), 0, root->size);
+        // If this was a small block, and there is space left in the small block cache, add it to the cache.
+        if (root->size == min_block_size && num_small_blocks != small_block_cache.size()) {
+            small_block_cache[num_small_blocks++] = root;
+        }
         // If there is a parent, check if both left and right of it are free
         if (parent && parent->left->free && parent->right->free) {
             // If so, merge those blocks
@@ -185,6 +194,16 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
 [[nodiscard]] bool memory_pool::merge_blocks(block* parent) {
     if (!parent->left || !parent->right) return false;
     if (!parent->left->free || !parent->right->free) return false;
+
+    // can't merge blocks that are in the small block cache
+    bool found = false;
+    for (std::size_t i = 0; i < num_small_blocks; ++i) {
+        if (small_block_cache[i] == parent->left.get() || small_block_cache[i] == parent->right.get()) {
+            found = true;
+            break;
+        }
+    }
+    if (found) return false;
 
     // Once validated, merging is very simple: just set left and right to null.
     parent->left = nullptr;

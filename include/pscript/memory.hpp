@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <array>
 
 namespace ps {
 
@@ -109,6 +110,8 @@ private:
     static constexpr inline std::size_t min_block_size = 16; // TODO check if this doesnt waste too much memory.
     // TODO: possibly split into 2 allocators, one for small allocations with small max block size, one for larger allocations with bigger max block size.
 
+    static constexpr inline std::size_t small_block_cache_size = 8;
+
     /**
      * @brief Represents a block in the buddy allocator.
      *        If left and right are both nullptr, this block is a full size block.
@@ -126,6 +129,9 @@ private:
     // Root block is the initial block and represents the full memory range.
     // Traversal will always start here.
     std::unique_ptr<block> root_block = nullptr;
+
+    std::array<block*, small_block_cache_size> small_block_cache {};
+    std::size_t num_small_blocks = 0;
 
     // Finds a block to allocate with given size, starting at a given root block.
     // This may further subdivide the blocks to create new smaller blocks.

@@ -324,7 +324,7 @@ TEST_CASE("script", "[script]") {
 }
 
 TEST_CASE("control sequences", "[script]") {
-    constexpr std::size_t memsize = 512;
+    constexpr std::size_t memsize = 1024;
     ps::context ctx(memsize);
 
     std::ostringstream out {};
