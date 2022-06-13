@@ -105,11 +105,15 @@ public:
     }
 
     plib::erased_function<ps::value>* get_function(std::string const& name) override {
-        return functions.at(name);
+        auto it = functions.find(name);
+        if (it != functions.end()) return it->second;
+        return nullptr;
     }
 
     void* get_variable(std::string const& name) override {
-        return variables.at(name);
+        auto it = variables.find(name);
+        if (it != variables.end()) return it->second;
+        return nullptr;
     }
 
     ~extern_library() {
@@ -749,4 +753,156 @@ TEST_CASE("perceptron") {
 
     ps::script script(source, ctx);
     ctx.execute(script);
+}
+
+int test_f(int x) {
+
+}
+
+TEST_CASE("error reporting") {
+    constexpr size_t memsize = 1024 * 1024;
+    ps::context ctx(memsize);
+
+    ps::execution_context exec;
+
+    SECTION("undeclared variable") {
+        std::string source = R"(
+            let x = y; // y is undeclared
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("no extern lib - functions") {
+        std::string source = R"(
+            extern fn f() -> void;
+
+            f();
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("no extern lib - variables") {
+        std::string source = R"(
+            extern let x -> int;
+            __print(x);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("function argument count") {
+        std::string source = R"(
+            fn foo(a: int, b: float) -> void {
+
+            }
+
+            foo(1, 2, 3);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("undefined function") {
+        std::string source = R"(
+            foo(1, 2, 3);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("external call with too many arguments") {
+        auto externs = extern_library {};
+        externs.add_function(ctx, "foo", &test_f);
+        exec.externs = &externs;
+
+        std::string source = R"(
+            extern fn foo(a1: int, a2: int, a3: int, a4: int, a5: int, a6: int, a7: int, a8: int, a9: int) -> int;
+
+            foo(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("extern function not found") {
+        auto externs = extern_library {};
+        exec.externs = &externs;
+
+        std::string source = R"(
+            extern fn foo() -> void;
+
+            foo();
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("extern variable not found") {
+        auto externs = extern_library {};
+        exec.externs = &externs;
+
+        std::string source = R"(
+            extern let x -> int;
+
+            let y = x;
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("list append") {
+        std::string source = R"(
+            let l = [];
+            l.append(1, 2);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("__print") {
+        std::string source = R"(
+            __print(1, 2);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("invalid import") {
+        std::string source = R"(
+            import xyz.meme_folder;
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("invalid cast") {
+        std::string source = R"(
+            let s = str { 123 };
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("undefined struct") {
+        std::string source = R"(
+            let x = Struct { 1, 2, "abc" };
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
 }

@@ -1,0 +1,8 @@
+- [ ] optimize interpreter
+  - [ ] remove all string comparisons (possibly just hash strings?)
+- [ ] clean up code
+- [ ] various TODO's in code
+- [ ] enforce type checking
+- [X] error reporting
+- [ ] documentation/tutorial on how to use
+- [ ] extend standard library and functions for list/string types

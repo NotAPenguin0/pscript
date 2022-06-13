@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <utility>
 
 // TODO: proper error reporting
 
@@ -283,9 +284,9 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
 }
 
 
-ps::variable& context::get_variable(std::string const& name, block_scope* scope) {
+ps::variable& context::get_variable(std::string const& name, peg::Ast const* node, block_scope* scope) {
     ps::variable* var = find_variable(name, scope);
-    if (!var) throw std::runtime_error("variable not declared in current scope: " + name);
+    if (!var) report_error(node, "Variable '" + name + "'not declared in current scope.");
     else return *var;
 }
 
@@ -303,15 +304,21 @@ ps::variable& context::get_variable(std::string const& name, block_scope* scope)
     else return &it->second;
 }
 
-ps::value& context::get_variable_value(std::string const& name, block_scope* scope) {
-    return get_variable(name, scope).value();
+ps::value& context::get_variable_value(std::string const& name, peg::Ast const* node, block_scope* scope) {
+    return get_variable(name, node, scope).value();
 }
 
 
 void context::execute(ps::script const& script, ps::execution_context exec) {
-    std::shared_ptr<peg::Ast> const& ast = script.ast();
-    exec_ctx = exec;
-    execute(ast.get(), nullptr); // start execution in global scope
+    try {
+        std::shared_ptr<peg::Ast> const& ast = script.ast();
+        exec_ctx = std::move(exec);
+        execute(ast.get(), nullptr); // start execution in global scope
+    } catch(std::exception const& e) {
+        if (exec_ctx.err) {
+            *exec_ctx.err << "execution terminated due to unexpected exception: " << e.what() << std::endl;
+        }
+    }
 }
 
 ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {
@@ -436,8 +443,8 @@ void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* initializer = find_child_with_type(node, "expression");
 
-    if (!identifier) throw std::runtime_error("[decl] expected identifier");
-    if (!initializer) throw std::runtime_error("[decl] expected initializer");
+    if (!identifier) report_error(node, "Expected an identifier in declaration.");
+    if (!initializer) report_error(node, "Expected an initializer in declaration.");
 
     ps::value init_val = evaluate_expression(initializer, scope);
 
@@ -511,13 +518,14 @@ ps::type context::evaluate_type(peg::Ast const* node) {
 }
 
 void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
-    if (!exec_ctx.externs) throw std::runtime_error("no extern library bound");
+    if (!exec_ctx.externs) report_error(node, "Tried to load external variable, but no extern library was bound.");
 
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* type = find_child_with_type(node, "typename");
 
     std::string name = namespace_prefix + identifier->token_to_string();
     void* external_ptr = exec_ctx.externs->get_variable(name);
+    if (!external_ptr) report_error(node, "External variable '" + name + "' not found in extern library.");
     ps::type stored_type = evaluate_type(type);
     ps::value val = ps::value::from(memory(), ps::external_type { external_ptr, stored_type });
     auto& _ = create_variable(name, std::move(val));
@@ -550,6 +558,11 @@ void context::evaluate_import(peg::Ast const* node) {
         filepath = mod_path + path;
         std::ifstream in { filepath };
         if (in.is_open()) break; // found matching path
+    }
+
+    {
+        std::ifstream in {filepath}; // TODO: pass this stream to read_script()
+        if (!in.is_open()) report_error(node, "Module " + filepath + " not found.");
     }
 
     // import only if not yet imported
@@ -610,8 +623,8 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope, bo
 
     // identifier
     if (ref) {
-        return ps::value::ref(get_variable_value(str_repr, scope));
-    } else return get_variable_value(str_repr, scope);
+        return ps::value::ref(get_variable_value(str_repr, node, scope));
+    } else return get_variable_value(str_repr, node, scope);
 }
 
 ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope) {
@@ -649,7 +662,7 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
         value = &access_member(lhs, scope);
     } else {
         std::string tok = lhs->token_to_string();
-        ps::variable& var = get_variable(tok, scope);
+        ps::variable& var = get_variable(tok, lhs, scope);
         value = &var.value();
     }
     if (op_str == "=") return *value = right;
@@ -661,7 +674,7 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == "&=") return *value &= right;
     if (op_str == "%=") return *value %= right;
 
-    else throw std::runtime_error("[operator] operator " + op_str + " not implemented");
+    else report_error(op, "Operator '" + op_str + "' not implemented.");
 }
 
 std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref) {
@@ -697,8 +710,11 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
     // no work
     if (arguments.empty()) return;
 
-    if (arguments.size() != func->params.size()) throw std::runtime_error(
-            "[func_call] "s + func->name.data() + ": expected " + std::to_string(func->params.size()) + " arguments, got " + std::to_string(arguments.size()));
+    if (arguments.size() != func->params.size()) {
+        report_error(call_node,
+                     "In call to function "s + func->name.data() + ": expected " + std::to_string(func->params.size()) +
+                     " arguments, got " + std::to_string(arguments.size()) + '.');
+    }
 
     // create variables with function arguments in call scope
     for (size_t i = 0; i < arguments.size(); ++i) {
@@ -740,7 +756,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 
     auto it = functions.find(func_name);
     if (it == functions.end()) {
-        throw std::runtime_error("[func call] function " + func_name + " not found.\n");
+        report_error(node, "Function '" + func_name + "' is not defined.");
     }
 
     // If the 'node' field in our function is null, this is an external function call.
@@ -759,11 +775,12 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 }
 
 ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
-    if (!exec_ctx.externs) throw std::runtime_error("No function library bound, cannot evaluate external call to " + name);
+    if (!exec_ctx.externs) report_error(node, "No function library bound, cannot evaluate external call to " + name + '.');
 
     plib::erased_function<ps::value>* func = exec_ctx.externs->get_function(name);
+    if (!func) report_error(node, "External function '" + name + "' not found in extern library.");
     auto args = evaluate_argument_list(node, scope);
-    if (args.size() > 8) throw std::runtime_error("Tried to do an external call with more than 8 arguments");
+    if (args.size() > 8) report_error(node, "Unable to do an external call with more than 8 arguments.");
     if (args.empty()) return func->call();
     if (args.size() == 1) return func->call(args[0]);
     if (args.size() == 2) return func->call(args[0], args[1]);
@@ -782,7 +799,7 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
 
     ps::value& val = object.value();
     if (name == "append") {
-        if (arguments.size() != 1) throw std::runtime_error("[list::append] - expected 1 argument");
+        if (arguments.size() != 1) report_error(node, "In call to append(): expected exactly 1 argument.");
         static_cast<ps::list&>(val)->append(arguments.front());
     }
 
@@ -822,7 +839,7 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     // builtin function: print
     // TODO: print improvements (format string)
     if (name == "__print") {
-        if (arguments.empty()) throw std::runtime_error("[__print()] invalid argument count.");
+        if (arguments.empty()) report_error(node, "In call to __print(): expected exactly one argument.");
         ps::value const& to_print = arguments[0];
         *exec_ctx.out << to_print << std::endl;
         // success
@@ -856,7 +873,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         } else if (name == "uint") {
             if (arguments.empty()) return ps::value::from(memory(), unsigned {});
             else return ps::value::from(memory(), arguments[0].cast<unsigned int>());
-        } else throw std::runtime_error("not implemented");
+        } else report_error(node, "Cast to type '" + name + "' is not implemented or not supported.");
     }
     std::string namespace_name {};
     peg::Ast const* namespace_list = find_child_with_type(type, "namespace_list");
@@ -872,7 +889,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
     std::string struct_name = namespace_name + name->token_to_string();
     auto it = structs.find(struct_name);
     if (it == structs.end()) {
-        throw std::runtime_error("Struct '" + struct_name + "' not defined in current scope.");
+        report_error(node, "Struct '" + struct_name + "' not defined in current scope.");
     }
     auto const& struct_def = it->second;
     std::unordered_map<std::string, ps::value> initializers;
@@ -893,7 +910,7 @@ ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
 
     ps::value index_expr_val = evaluate_expression(index_expr, scope);
     auto& index = static_cast<ps::integer&>(index_expr_val);
-    auto& list_val = get_variable_value(identifier->token_to_string(), scope);
+    auto& list_val = get_variable_value(identifier->token_to_string(), identifier, scope);
     auto& list = static_cast<ps::list&>(list_val);
 
     ps::value& value = list->get(index.value());
@@ -904,7 +921,7 @@ ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
     peg::Ast const* first = node->nodes[0].get();
     ps::value* cur_val = nullptr;
     if (node_is_type(first, "identifier")) {
-        ps::variable& var = get_variable(first->token_to_string(), scope);
+        ps::variable& var = get_variable(first->token_to_string(), first, scope);
         cur_val = &var.value();
     } else if (node_is_type(first, "index_expression")) {
         cur_val = &index_list(first, scope);
@@ -985,9 +1002,9 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope,
                 } else if (op == "!") {
                     return !evaluate_expression(operand, scope);
                 } else if (op == "--") {
-                    return --get_variable_value(operand->token_to_string());
+                    return --get_variable_value(operand->token_to_string(), operand, scope);
                 } else if (op == "++") {
-                    return ++get_variable_value(operand->token_to_string());
+                    return ++get_variable_value(operand->token_to_string(), operand, scope);
                 } else if (op == "&") {
                     return evaluate_expression(operand, scope, true);
                 }
@@ -996,6 +1013,15 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope,
     }
 
     return ps::value::null();
+}
+
+void context::report_error(peg::Ast const* node, std::string_view message) const {
+    std::string error_string = "Error ";
+    if (node) { // if a node was provided we can add additional source location info
+        error_string += "at [" + std::to_string(node->line) + ":" + std::to_string(node->column) + "]: ";
+    }
+    error_string += message;
+    throw std::runtime_error(error_string);
 }
 
 } // namespace ps

@@ -33,6 +33,7 @@ public:
 struct execution_context {
     std::istream* in = &std::cin;
     std::ostream* out = &std::cout;
+    std::ostream* err = &std::cerr;
     extern_library* externs = nullptr;
     std::vector<std::string> module_paths = { "pscript-modules/" };
 };
@@ -93,8 +94,8 @@ public:
 
     [[nodiscard]] ps::variable& create_variable(std::string const& name, ps::value&& initializer, block_scope* scope = nullptr);
 
-    [[nodiscard]] ps::variable& get_variable(std::string const& name, block_scope* scope);
-    [[nodiscard]] ps::value& get_variable_value(std::string const& name, block_scope* scope = nullptr);
+    [[nodiscard]] ps::variable& get_variable(std::string const& name, peg::Ast const* node = nullptr, block_scope* scope = nullptr);
+    [[nodiscard]] ps::value& get_variable_value(std::string const& name, peg::Ast const* node = nullptr, block_scope* scope = nullptr);
 
     /**
      * @brief Executes a script in this context.
@@ -190,6 +191,8 @@ private:
     ps::value evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref = false);
     ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
+
+    void report_error(peg::Ast const* node, std::string_view message) const;
 };
 
 }

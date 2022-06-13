@@ -173,6 +173,8 @@ int main() {
 
     ctx.execute(perceptron, exec);
 
+    float last_time = glfwGetTime();
+
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
