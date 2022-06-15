@@ -6,3 +6,4 @@
 - [X] error reporting
 - [ ] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types
+- [ ] external functions with no return type
