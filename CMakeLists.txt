@@ -23,7 +23,7 @@ endif()
 
 FetchContent_Declare(
   peglib
-  GIT_REPOSITORY https://github.com/yhirose/cpp-peglib
+  GIT_REPOSITORY https://github.com/NotAPenguin0/cpp-peglib
 )
 FetchContent_MakeAvailable(peglib)
 
