@@ -2,12 +2,10 @@
 
 #include <peglib.h>
 
-#include <iostream>
 #include <fstream>
 #include <string>
 #include <utility>
-
-// TODO: proper error reporting
+#include <plib/macros.hpp>
 
 namespace ps {
 
@@ -230,6 +228,8 @@ for_each <- 'let ' identifier space colon space expression
 comment <- '//' any '\n'
 )";
 
+using namespace std::literals::string_literals;
+
 context::context(std::size_t mem_size) : mem(mem_size) {
     ast_parser = std::make_unique<peg::parser>(grammar);
     ast_parser->enable_ast();
@@ -244,7 +244,7 @@ ps::memory_pool const& context::memory() const noexcept {
     return mem;
 }
 
-void context::dump_memory() const noexcept {
+[[maybe_unused]] void context::dump_memory() const noexcept {
     auto print = [this](ps::pointer ptr) {
         auto const v = static_cast<uint8_t>(mem[ptr]);
         printf("%02X", v);
@@ -288,6 +288,8 @@ ps::variable& context::get_variable(std::string const& name, peg::Ast const* nod
     ps::variable* var = find_variable(name, scope);
     if (!var) report_error(node, "Variable '" + name + "'not declared in current scope.");
     else return *var;
+
+    PLIB_UNREACHABLE();
 }
 
 [[nodiscard]] ps::variable* context::find_variable(std::string const& name, block_scope* scope) {
@@ -428,14 +430,14 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
     else return ps::value::null();
 }
 
-peg::Ast const* context::find_child_with_type(peg::Ast const* node, std::string_view type) const noexcept {
+peg::Ast const* context::find_child_with_type(peg::Ast const* node, std::string_view type) noexcept {
     for (auto const& child : node->nodes) {
         if (child->original_name == type || child->name == type) return child.get();
     }
     return nullptr;
 }
 
-bool context::node_is_type(peg::Ast const* node, std::string_view type) const noexcept {
+bool context::node_is_type(peg::Ast const* node, std::string_view type) noexcept {
     return node->name == type || node->original_name == type;
 }
 
@@ -524,7 +526,14 @@ void context::evaluate_extern_variable(peg::Ast const* node, std::string const& 
     peg::Ast const* type = find_child_with_type(node, "typename");
 
     std::string name = namespace_prefix + identifier->token_to_string();
-    void* external_ptr = exec_ctx.externs->get_variable(name);
+
+    void* external_ptr = nullptr;
+    extern_library* cur = exec_ctx.externs;
+    while(external_ptr == nullptr && cur != nullptr) {
+        external_ptr = cur->get_variable(name);
+        cur = cur->next.get();
+    }
+
     if (!external_ptr) report_error(node, "External variable '" + name + "' not found in extern library.");
     ps::type stored_type = evaluate_type(type);
     ps::value val = ps::value::from(memory(), ps::external_type { external_ptr, stored_type });
@@ -675,6 +684,8 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == "%=") return *value %= right;
 
     else report_error(op, "Operator '" + op_str + "' not implemented.");
+
+    PLIB_UNREACHABLE();
 }
 
 std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref) {
@@ -703,7 +714,6 @@ std::string context::parse_namespace(peg::Ast const* node) {
 }
 
 void context::prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope) {
-    using namespace std::literals::string_literals;
     func_scope->parent = nullptr; // parent is global scope for function calls (as you can't access variables from previous scope, unlike in if statements).
 
     auto arguments = evaluate_argument_list(call_node, call_scope);
@@ -730,7 +740,6 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     peg::Ast const* func_identifier_node = find_child_with_type(node, "identifier");
 
     // namespaced functions are simply stored by concatenating their names together to make the full name, but we won't implement that yet
-    // TODO: implement namespaces
     std::string func_name = func_identifier_node->token_to_string();
 
     std::string namespace_name;
@@ -777,7 +786,13 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
     if (!exec_ctx.externs) report_error(node, "No function library bound, cannot evaluate external call to " + name + '.');
 
-    plib::erased_function<ps::value>* func = exec_ctx.externs->get_function(name);
+    plib::erased_function<ps::value>* func = nullptr;
+    extern_library* cur = exec_ctx.externs;
+    while(func == nullptr && cur != nullptr) {
+        func = cur->get_function(name);
+        cur = cur->next.get();
+    }
+
     if (!func) report_error(node, "External function '" + name + "' not found in extern library.");
     auto args = evaluate_argument_list(node, scope);
     if (args.size() > 8) report_error(node, "Unable to do an external call with more than 8 arguments.");
@@ -791,7 +806,7 @@ ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* sco
     if (args.size() == 7) return func->call(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
     if (args.size() == 8) return func->call(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
 
-    return ps::value::null();
+    PLIB_UNREACHABLE();
 }
 
 ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
@@ -806,6 +821,8 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
     if (name == "size") {
         return ps::value::from(memory(), (int)static_cast<ps::list&>(val)->size());
     }
+
+    else report_error(node, "Unknown list member function: "s + name.data() + "."s);
 
     return ps::value::null();
 }
@@ -897,7 +914,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         initializers.insert({ struct_def.members[i].name, std::move(arguments[i]) });
     }
     // add default initializers
-    for (int j = arguments.size(); j < struct_def.members.size(); ++j) {
+    for (std::size_t j = arguments.size(); j < struct_def.members.size(); ++j) {
         initializers.insert({struct_def.members[j].name, struct_def.members[j].default_value});
     }
 
@@ -1015,7 +1032,7 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope,
     return ps::value::null();
 }
 
-void context::report_error(peg::Ast const* node, std::string_view message) const {
+void context::report_error(peg::Ast const* node, std::string_view message) {
     std::string error_string = "Error ";
     if (node) { // if a node was provided we can add additional source location info
         error_string += "at [" + std::to_string(node->line) + ":" + std::to_string(node->column) + "]: ";

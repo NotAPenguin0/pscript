@@ -28,6 +28,31 @@ class extern_library {
 public:
     virtual plib::erased_function<ps::value>* get_function(std::string const& name) = 0;
     virtual void* get_variable(std::string const& name) = 0;
+
+    virtual ~extern_library() = default;
+
+    std::unique_ptr<extern_library> next = nullptr;
+};
+
+struct extern_library_chain_builder {
+private:
+    extern_library* cur_node = nullptr;
+    std::unique_ptr<extern_library> lib;
+public:
+    extern_library_chain_builder& add(std::unique_ptr<extern_library>&& library) {
+        if (lib == nullptr) {
+            lib = std::move(library);
+            cur_node = lib.get();
+        } else {
+            cur_node->next = std::move(library);
+            cur_node = cur_node->next.get();
+        }
+        return *this;
+    }
+
+    std::unique_ptr<extern_library> get() {
+        return std::move(lib);
+    }
 };
 
 struct execution_context {
@@ -65,7 +90,7 @@ public:
     /**
      * @brief Dumps memory to stdout
      */
-    void dump_memory() const noexcept;
+    [[maybe_unused]] void dump_memory() const noexcept;
 
     /**
      * @brief Get a reference to the parser object used for parsing scripts.
@@ -153,14 +178,14 @@ private:
 
     ps::value execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix = ""); // namespace prefix used for importing
 
-    peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) const noexcept;
+    static peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) noexcept;
 
     [[nodiscard]] ps::variable* find_variable(std::string const& name, block_scope* scope);
 
     // checks both name and original_name
-    bool node_is_type(peg::Ast const* node, std::string_view type) const noexcept;
+    static bool node_is_type(peg::Ast const* node, std::string_view type) noexcept;
 
-    ps::type evaluate_type(peg::Ast const* node);
+    static ps::type evaluate_type(peg::Ast const* node);
 
     void evaluate_declaration(peg::Ast const* node, block_scope* scope);
     void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
@@ -171,7 +196,7 @@ private:
 
     std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref = false);
 
-    std::string parse_namespace(peg::Ast const* node);
+    static std::string parse_namespace(peg::Ast const* node);
 
     // clears variables in scope, then creates variables for arguments.
     void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
@@ -192,7 +217,7 @@ private:
     ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
 
-    void report_error(peg::Ast const* node, std::string_view message) const;
+    static void report_error(peg::Ast const* node, std::string_view message) ;
 };
 
 }

@@ -3,31 +3,9 @@
 #include <iostream>
 #include <fstream>
 
-#include <pscript/tokenizer.hpp>
-
-std::ostream& operator<<(std::ostream& out, ps::token_type const& type) {
-#define gen(name) if (type == ps::token_type:: name) return out << #name ;
-    gen(none)
-    gen(identifier)
-    gen(keyword)
-    gen(brace)
-    gen(parenthesis)
-    gen(semicolon)
-    gen(comma)
-    gen(op)
-    gen(constant)
-#undef gen
-    return out;
-}
-
-std::ostream& operator<<(std::ostream& out, ps::token const& tok) {
-    return out << tok.str << '(' << tok.type << ')';
-}
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 #include <catch2/matchers/catch_matchers_predicate.hpp>
-#include <catch2/matchers/catch_matchers_templated.hpp>
 
 using Catch::Matchers::Equals;
 using Catch::Matchers::Predicate;
@@ -41,52 +19,7 @@ bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer e
     return true;
 }
 
-struct TokenEqualMatcher : Catch::Matchers::MatcherGenericBase {
-    explicit TokenEqualMatcher(std::vector<std::string> const& tokens)
-    : tokens{ tokens } {
-
-    }
-
-    bool match(std::vector<ps::token> const& other) const {
-        return std::equal(tokens.begin(), tokens.end(),
-                          other.begin(), other.end(),
-                          [](std::string const& a, ps::token const& b) {
-                                     return a == b.str;
-                                }
-        );
-    }
-
-    std::string describe() const override {
-        return "Token strings equal: " + Catch::rangeToString(tokens);
-    }
-
-private:
-    std::vector<std::string> const& tokens;
-};
-
-struct TokenTypeMatcher : Catch::Matchers::MatcherGenericBase {
-    explicit TokenTypeMatcher(std::vector<ps::token_type> const& tokens) : tokens{tokens} {
-
-    }
-
-    bool match(std::vector<ps::token> const& other) const {
-        return std::equal(tokens.begin(), tokens.end(),
-                          other.begin(), other.end(),
-                          [](ps::token_type a, ps::token const& b) {
-                              return a == b.type;
-                          }
-        );
-    }
-
-    std::string describe() const override {
-        return "Token types equal: " + Catch::rangeToString(tokens);
-    }
-
-private:
-    std::vector<ps::token_type> const& tokens;
-};
-
-// requires that output stream is a stringstream
+// requires that output stream is a std::ostringstream
 static bool output_equal(ps::execution_context& exec, std::string const& expected) {
     return dynamic_cast<std::ostringstream*>(exec.out)->str() == expected;
 }
@@ -116,7 +49,7 @@ public:
         return nullptr;
     }
 
-    ~extern_library() {
+    ~extern_library() override {
         for (auto& [k, v] : functions) {
             delete v;
         }
@@ -127,6 +60,37 @@ private:
     std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
     std::unordered_map<std::string, void*> variables;
 };
+
+float add(float a, float b) {
+    return a + b;
+}
+
+void no_ret_type(int x) {
+    std::cout << x << std::endl;
+}
+
+// external type must be integer
+int print_int(ps::external const& ext) {
+    std::cout << static_cast<int const&>(ext.value()) << std::endl;
+    return 0;
+}
+
+struct external_struct {
+    int x;
+};
+
+int print_ext_struct(ps::external const& ext) {
+    std::cout << static_cast<external_struct const&>(ext.value()).x << std::endl;
+    return 0;
+}
+
+void test_f([[maybe_unused]] int x) {
+
+}
+
+void lib_a() {
+    std::cout << "lib a\n";
+}
 
 TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
@@ -659,24 +623,24 @@ TEST_CASE("structs") {
     }
 }
 
-float add(float a, float b) {
-    return a + b;
-}
-
-void no_ret_type(int x) {
-    std::cout << x << std::endl;
-}
-
 TEST_CASE("external functions") {
     constexpr size_t memsize = 1024;
     ps::context ctx(memsize);
 
-    extern_library lib {};
-    lib.add_function(ctx, "add", &add);
-    lib.add_function(ctx, "print_extern", &no_ret_type);
+    std::unique_ptr<extern_library> lib = std::make_unique<extern_library>();
+    lib->add_function(ctx, "add", &add);
+    lib->add_function(ctx, "print_extern", &no_ret_type);
+
+    std::unique_ptr<extern_library> other_lib = std::make_unique<extern_library>();
+    lib->add_function(ctx, "lib_a", &lib_a);
+
+    auto extern_lib = ps::extern_library_chain_builder{}
+        .add(std::move(lib))
+        .add(std::move(other_lib))
+        .get();
 
     ps::execution_context exec {};
-    exec.externs = &lib;
+    exec.externs = extern_lib.get();
 
     std::string source = R"(
         import std.io;
@@ -684,28 +648,15 @@ TEST_CASE("external functions") {
         extern fn add(a: float, b: float) -> float;
         extern fn print_extern(x: int) -> void;
 
+        extern fn lib_a() -> void;
+
         std.io.print(add(1.1, 2.2));
         print_extern(1000);
+        lib_a();
     )";
 
     ps::script script(source, ctx);
     ctx.execute(script, exec);
-}
-
-// external type must be integer
-// todo: possibly add specializations for void return type to concrete_function
-int print_int(ps::external const& ext) {
-    std::cout << static_cast<int const&>(ext.value()) << std::endl;
-    return 0;
-}
-
-struct external_struct {
-    int x;
-};
-
-int print_ext_struct(ps::external const& ext) {
-    std::cout << static_cast<external_struct const&>(ext.value()).x << std::endl;
-    return 0;
 }
 
 TEST_CASE("external types") {
@@ -760,10 +711,6 @@ TEST_CASE("perceptron") {
 
     ps::script script(source, ctx);
     ctx.execute(script);
-}
-
-int test_f(int x) {
-
 }
 
 TEST_CASE("error reporting") {
