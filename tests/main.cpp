@@ -4,11 +4,6 @@
 #include <fstream>
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
-#include <catch2/matchers/catch_matchers_predicate.hpp>
-
-using Catch::Matchers::Equals;
-using Catch::Matchers::Predicate;
 
 template<typename T>
 bool range_equal(ps::memory_pool const& memory, ps::pointer begin, ps::pointer end, T const& val) {
