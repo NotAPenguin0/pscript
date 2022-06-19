@@ -663,12 +663,17 @@ float add(float a, float b) {
     return a + b;
 }
 
+void no_ret_type(int x) {
+    std::cout << x << std::endl;
+}
+
 TEST_CASE("external functions") {
     constexpr size_t memsize = 1024;
     ps::context ctx(memsize);
 
     extern_library lib {};
     lib.add_function(ctx, "add", &add);
+    lib.add_function(ctx, "print_extern", &no_ret_type);
 
     ps::execution_context exec {};
     exec.externs = &lib;
@@ -677,8 +682,10 @@ TEST_CASE("external functions") {
         import std.io;
 
         extern fn add(a: float, b: float) -> float;
+        extern fn print_extern(x: int) -> void;
 
         std.io.print(add(1.1, 2.2));
+        print_extern(1000);
     )";
 
     ps::script script(source, ctx);

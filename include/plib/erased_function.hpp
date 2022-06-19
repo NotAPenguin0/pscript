@@ -22,6 +22,17 @@ public:
     virtual V call(V v1, V v2, V v3, V v4, V v5, V v6, V v7) { return V {}; }
     virtual V call(V v1, V v2, V v3, V v4, V v5, V v6, V v7, V v8) { return V {}; }
 
+    // call function with no return type
+    virtual void call_void() {}
+    virtual void call_void(V v1) {}
+    virtual void call_void(V v1, V v2) {}
+    virtual void call_void(V v1, V v2, V v3) {}
+    virtual void call_void(V v1, V v2, V v3, V v4) {}
+    virtual void call_void(V v1, V v2, V v3, V v4, V v5) {}
+    virtual void call_void(V v1, V v2, V v3, V v4, V v5, V v6) {}
+    virtual void call_void(V v1, V v2, V v3, V v4, V v5, V v6, V v7) {}
+    virtual void call_void(V v1, V v2, V v3, V v4, V v5, V v6, V v7, V v8) {}
+
     virtual ~erased_function() = default;
 };
 
@@ -39,6 +50,16 @@ struct call_func<R, pack<Args...>, pack<Values...>> {
     R (* function)(Args...) = nullptr;
 
     R operator()(Values& ... values) {
+        return function(static_cast<Args>(values) ...);
+    }
+};
+
+// Specialization for no return type
+template<typename... Args, typename... Values>
+struct call_func<void, pack<Args...>, pack<Values...>> {
+    void (* function)(Args...) = nullptr;
+
+    void operator()(Values& ... values) {
         return function(static_cast<Args>(values) ...);
     }
 };
@@ -76,6 +97,34 @@ public:
 
     R (*function)(Args...) = nullptr;
     std::function<V(R const&)> create_value;
+};
+
+template<typename V, typename... Args, typename... Values>
+class concrete_function<void(Args...), V, pack<Values...>> : public erased_function<V> {
+public:
+    static_assert(sizeof... (Args) == sizeof... (Values), "Size must match");
+
+    // create func parameter ignored
+    template<typename CreateFunc>
+    concrete_function(void (*f)(Args...), CreateFunc&&) {
+        function = f;
+    }
+
+    ~concrete_function() override = default;
+
+    V operator()(Values... values) {
+        return call(values...);
+    }
+
+    V call(Values... values) override {
+        detail::call_func<void, pack<Args...>, typename make_pack<sizeof...(Args), V>::type> caller { function };
+        // call the function
+        caller(values...);
+        // return default value
+        return V {};
+    }
+
+    void (*function)(Args...) = nullptr;
 };
 
 /**
