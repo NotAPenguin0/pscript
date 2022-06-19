@@ -445,8 +445,14 @@ void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* initializer = find_child_with_type(node, "expression");
 
-    if (!identifier) report_error(node, "Expected an identifier in declaration.");
-    if (!initializer) report_error(node, "Expected an initializer in declaration.");
+    if (!identifier) {
+        report_error(node, "Expected an identifier in declaration.");
+        PLIB_UNREACHABLE();
+    }
+    if (!initializer) {
+        report_error(node, "Expected an initializer in declaration.");
+        PLIB_UNREACHABLE();
+    }
 
     ps::value init_val = evaluate_expression(initializer, scope);
 
@@ -520,7 +526,10 @@ ps::type context::evaluate_type(peg::Ast const* node) {
 }
 
 void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
-    if (!exec_ctx.externs) report_error(node, "Tried to load external variable, but no extern library was bound.");
+    if (!exec_ctx.externs) {
+        report_error(node, "Tried to load external variable, but no extern library was bound.");
+        PLIB_UNREACHABLE();
+    }
 
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* type = find_child_with_type(node, "typename");
@@ -534,7 +543,10 @@ void context::evaluate_extern_variable(peg::Ast const* node, std::string const& 
         cur = cur->next.get();
     }
 
-    if (!external_ptr) report_error(node, "External variable '" + name + "' not found in extern library.");
+    if (!external_ptr) {
+        report_error(node, "External variable '" + name + "' not found in extern library.");
+        PLIB_UNREACHABLE();
+    }
     ps::type stored_type = evaluate_type(type);
     ps::value val = ps::value::from(memory(), ps::external_type { external_ptr, stored_type });
     auto& _ = create_variable(name, std::move(val));
@@ -571,7 +583,10 @@ void context::evaluate_import(peg::Ast const* node) {
 
     {
         std::ifstream in {filepath}; // TODO: pass this stream to read_script()
-        if (!in.is_open()) report_error(node, "Module " + filepath + " not found.");
+        if (!in.is_open()) {
+            report_error(node, "Module " + filepath + " not found.");
+            PLIB_UNREACHABLE();
+        }
     }
 
     // import only if not yet imported
@@ -724,6 +739,7 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
         report_error(call_node,
                      "In call to function "s + func->name.data() + ": expected " + std::to_string(func->params.size()) +
                      " arguments, got " + std::to_string(arguments.size()) + '.');
+        PLIB_UNREACHABLE();
     }
 
     // create variables with function arguments in call scope
@@ -766,6 +782,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     auto it = functions.find(func_name);
     if (it == functions.end()) {
         report_error(node, "Function '" + func_name + "' is not defined.");
+        PLIB_UNREACHABLE();
     }
 
     // If the 'node' field in our function is null, this is an external function call.
@@ -784,7 +801,10 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 }
 
 ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
-    if (!exec_ctx.externs) report_error(node, "No function library bound, cannot evaluate external call to " + name + '.');
+    if (!exec_ctx.externs) {
+        report_error(node, "No function library bound, cannot evaluate external call to " + name + '.');
+        PLIB_UNREACHABLE();
+    }
 
     plib::erased_function<ps::value>* func = nullptr;
     extern_library* cur = exec_ctx.externs;
@@ -814,15 +834,17 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
 
     ps::value& val = object.value();
     if (name == "append") {
-        if (arguments.size() != 1) report_error(node, "In call to append(): expected exactly 1 argument.");
+        if (arguments.size() != 1) {
+            report_error(node, "In call to append(): expected exactly 1 argument.");
+            PLIB_UNREACHABLE();
+        }
         static_cast<ps::list&>(val)->append(arguments.front());
-    }
-
-    if (name == "size") {
+    } else if (name == "size") {
         return ps::value::from(memory(), (int)static_cast<ps::list&>(val)->size());
+    } else {
+        report_error(node, "Unknown list member function: "s + name.data() + "."s);
+        PLIB_UNREACHABLE();
     }
-
-    else report_error(node, "Unknown list member function: "s + name.data() + "."s);
 
     return ps::value::null();
 }
@@ -854,9 +876,12 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     }
     auto arguments = evaluate_argument_list(node, scope);
     // builtin function: print
-    // TODO: print improvements (format string)
+    // TODO: possibly allow variadics? (up to maximum amount)
     if (name == "__print") {
-        if (arguments.empty()) report_error(node, "In call to __print(): expected exactly one argument.");
+        if (arguments.empty()) {
+            report_error(node, "In call to __print(): expected exactly one argument.");
+            PLIB_UNREACHABLE();
+        }
         ps::value const& to_print = arguments[0];
         *exec_ctx.out << to_print << std::endl;
         // success
@@ -891,6 +916,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
             if (arguments.empty()) return ps::value::from(memory(), unsigned {});
             else return ps::value::from(memory(), arguments[0].cast<unsigned int>());
         } else report_error(node, "Cast to type '" + name + "' is not implemented or not supported.");
+        PLIB_UNREACHABLE();
     }
     std::string namespace_name {};
     peg::Ast const* namespace_list = find_child_with_type(type, "namespace_list");
@@ -907,6 +933,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
     auto it = structs.find(struct_name);
     if (it == structs.end()) {
         report_error(node, "Struct '" + struct_name + "' not defined in current scope.");
+        PLIB_UNREACHABLE();
     }
     auto const& struct_def = it->second;
     std::unordered_map<std::string, ps::value> initializers;
