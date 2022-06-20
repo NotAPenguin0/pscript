@@ -489,8 +489,9 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
         for (auto const& child : params->nodes) {
             if (!node_is_type(child.get(), "parameter")) continue;
             peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
-            // TODO: extract type information
-            func.params.push_back(function::parameter{ .name = param_name->token_to_string() });
+            peg::Ast const* param_type = find_child_with_type(child.get(), "typename");
+            ps::type const type = evaluate_type(param_type);
+            func.params.push_back(function::parameter{ .name = param_name->token_to_string(), .type = type });
         }
     }
     // TODO: return type information?

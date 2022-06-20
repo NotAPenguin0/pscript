@@ -896,4 +896,15 @@ TEST_CASE("type checking") {
         ps::script script(source, ctx);
         ctx.execute(script, exec);
     }
+
+    SECTION("function parameters") {
+        std::string source = R"(
+            fn f(a: int, b: float) -> void {
+
+            }
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
 }
