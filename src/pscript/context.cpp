@@ -5,6 +5,8 @@
 #include <fstream>
 #include <string>
 #include <utility>
+#include <iomanip>
+
 #include <plib/macros.hpp>
 
 namespace ps {
@@ -247,10 +249,15 @@ ps::memory_pool const& context::memory() const noexcept {
 [[maybe_unused]] void context::dump_memory() const noexcept {
     if (!exec_ctx.out) return;
     auto& out = *exec_ctx.out;
-    out << std::hex;
+    auto old_flags = out.flags();
+    auto old_precision = out.precision();
+    auto old_fill = out.fill();
+
+    out << std::setw(2) << std::uppercase << std::hex;
+
     auto print = [this, &out](ps::pointer ptr) {
         auto const v = static_cast<uint8_t>(mem[ptr]);
-        out << v;
+        out << static_cast<uint32_t>(v);
     };
 
     for (auto it = mem.begin(); it != mem.end(); it += 32) {
@@ -265,7 +272,10 @@ ps::memory_pool const& context::memory() const noexcept {
         out << "\n";
     }
 
-    out << std::endl << std::dec;
+    out << std::endl;
+    out.precision(old_precision);
+    out.flags(old_flags);
+    out.fill(old_fill);
 }
 
 peg::parser const& context::parser() const noexcept {
@@ -744,7 +754,7 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
     if (arguments.size() != func->params.size()) {
         report_error(call_node,
                      "In call to function "s + func->name.data() + ": expected " + std::to_string(func->params.size()) +
-                     " arguments, got " + std::to_string(arguments.size()) + '.');
+                     " arguments, got " + std::to_string(arguments.size()) + ".");
         PLIB_UNREACHABLE();
     }
 
