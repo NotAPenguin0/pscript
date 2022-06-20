@@ -136,11 +136,11 @@ TEST_CASE("pscript context", "[context]") {
         ps::memory_pool& memory = ctx.memory();
 
         ps::variable& x = ctx.create_variable("x", 5);
-        CHECK(x.value().int_value() == 5);
+        CHECK(static_cast<int const&>(x.value()) == 5);
 
         // Variable shadowing
         ps::variable& x_float = ctx.create_variable("x", 3.14f);
-        CHECK(x.value().real_value() == 3.14f);
+        CHECK(static_cast<float const&>(x.value()) == 3.14f);
     }
 }
 
@@ -160,8 +160,8 @@ TEST_CASE("script expression parser", "[script]") {
 
         ps::value& y = ctx.get_variable_value("y");
         ps::value& z = ctx.get_variable_value("z");
-        CHECK(y.int_value() == 5);
-        CHECK(z.real_value() == 4.4f);
+        CHECK(static_cast<int const&>(y) == 5);
+        CHECK(static_cast<int const&>(z) == 4.4f);
     }
 
     SECTION("basic operations") {
@@ -174,9 +174,9 @@ TEST_CASE("script expression parser", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("x").int_value() == 5);
-        CHECK(ctx.get_variable_value("y").int_value() == 10);
-        CHECK(ctx.get_variable_value("z").int_value() == 25);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("x")) == 5);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("y")) == 10);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("z")) == 25);
     }
 
     SECTION("parentheses and precedence") {
@@ -189,9 +189,9 @@ TEST_CASE("script expression parser", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("x").int_value() == 10);
-        CHECK(ctx.get_variable_value("y").int_value() == 8);
-        CHECK(ctx.get_variable_value("z").int_value() == 8);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("x")) == 10);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("y")) == 8);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("z")) == 8);
     }
 
     SECTION("floating point") {
@@ -205,10 +205,10 @@ TEST_CASE("script expression parser", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("x").real_value() == 3.5f);
-        CHECK(ctx.get_variable_value("y").real_value() == 2.5f);
-        CHECK(ctx.get_variable_value("z").real_value() == 3.5f);
-        CHECK(ctx.get_variable_value("w").real_value() == 3.5f);
+        CHECK(static_cast<float const&>(ctx.get_variable_value("x")) == 3.5f);
+        CHECK(static_cast<float const&>(ctx.get_variable_value("y")) == 2.5f);
+        CHECK(static_cast<float const&>(ctx.get_variable_value("z")) == 3.5f);
+        CHECK(static_cast<float const&>(ctx.get_variable_value("w")) == 3.5f);
     }
 }
 
@@ -224,7 +224,7 @@ TEST_CASE("floats in lists", "[script]") {
 
         ps::script script(source, ctx);
         ctx.execute(script);
-        CHECK(ctx.get_variable_value("a").real_value() == 0.6f);
+        CHECK(static_cast<float const&>(ctx.get_variable_value("a")) == 0.6f);
     }
 }
 
@@ -282,7 +282,7 @@ TEST_CASE("script", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
         // after executing foo(), the  original value in 'x' should be unmodified.
-        CHECK(ctx.get_variable_value("x").int_value() == 1);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("x")) == 1);
     }
 }
 
@@ -331,7 +331,7 @@ TEST_CASE("control sequences", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("f").int_value() == 89);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("f")) == 89);
     }
 
     SECTION("while") {
@@ -351,7 +351,7 @@ TEST_CASE("control sequences", "[script]") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("t").int_value() == 15);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("t")) == 15);
     }
 }
 
@@ -541,8 +541,8 @@ TEST_CASE("stdlib") {
         ps::script script(source, ctx);
         ctx.execute(script);
 
-        CHECK(ctx.get_variable_value("x").int_value().value() == 3);
-        CHECK(ctx.get_variable_value("y").int_value().value() == 4);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("x")) == 3);
+        CHECK(static_cast<int const&>(ctx.get_variable_value("y")) == 4);
     }
 
     SECTION("memory") {

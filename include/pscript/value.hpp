@@ -76,7 +76,7 @@ public:
         return val;
     }
 
-    T const& value() const {
+    [[nodiscard]] T const& value() const {
         return val;
     }
 
@@ -389,13 +389,13 @@ public:
     void append(ps::value const& val);
 
     ps::value& get(size_t index);
-    size_t size() const;
+    [[nodiscard]] size_t size() const;
 
-    std::string to_string() const;
+    [[nodiscard]] std::string to_string() const;
 
     friend std::ostream& operator<<(std::ostream& out, list_type const& list);
 
-    inline std::vector<ps::value> const& representation() const { return storage; }
+    [[nodiscard]] inline std::vector<ps::value> const& representation() const { return storage; }
 
     template<typename T>
     explicit operator T() const {
@@ -404,7 +404,7 @@ public:
 
 private:
     std::vector<ps::value> storage;
-    type stored_type {};
+    [[maybe_unused]] type stored_type {};
 };
 
 class string_type {
@@ -419,12 +419,12 @@ public:
 
     [[nodiscard]] string_type format(std::vector<ps::value> const& args) const;
 
-    int parse_int() const;
-    float parse_float() const;
+    [[nodiscard]] int parse_int() const;
+    [[nodiscard]] float parse_float() const;
 
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 
-    inline std::string const& representation() const { return storage; }
+    [[nodiscard]] inline std::string const& representation() const { return storage; }
 
     template<typename T>
     explicit operator T() const {
@@ -444,10 +444,10 @@ public:
     struct_type& operator=(struct_type const&) = default;
     struct_type& operator=(struct_type&&) noexcept = default;
 
-    std::string to_string() const;
+    [[nodiscard]] std::string to_string() const;
 
-    ps::value& access(std::string const& name);
-    ps::value const& access(std::string const& name) const;
+    [[nodiscard]] ps::value& access(std::string const& name);
+    [[nodiscard]] ps::value const& access(std::string const& name) const;
 
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 
@@ -481,11 +481,11 @@ public:
         return *reinterpret_cast<T const*>(ptr);
     }
 
-    inline ps::type stored_type() const {
+    [[maybe_unused]] [[nodiscard]] inline ps::type stored_type() const {
         return type;
     }
 
-    inline void* pointer() const {
+    [[nodiscard]] inline void* pointer() const {
         return ptr;
     }
 
@@ -554,11 +554,11 @@ public:
 
     inline bool is_null() const { return tpe == type::null; }
 
-    ps::integer& int_value();
-    ps::real& real_value();
+    [[deprecated("use operator T instead")]] ps::integer& int_value();
+    [[deprecated("use operator T instead")]] ps::real& real_value();
 
-    ps::integer const& int_value() const;
-    ps::real const& real_value() const;
+    [[maybe_unused, deprecated("use operator T instead")]] ps::integer const& int_value() const;
+    [[deprecated("use operator T instead")]] ps::real const& real_value() const;
 
     template<typename T>
     explicit operator T&() {
@@ -707,14 +707,14 @@ inline ps::value operator!(ps::value const& lhs) {
 }
 
 inline ps::value& operator++(ps::value& lhs) {
-    visit_value(lhs, [&lhs](auto& lhs_val) {
+    visit_value(lhs, [](auto& lhs_val) {
         lhs_val = lhs_val + ps::integer { 1 };
     });
     return lhs;
 }
 
 inline ps::value& operator--(ps::value& lhs) {
-    visit_value(lhs, [&lhs](auto& lhs_val) {
+    visit_value(lhs, [](auto& lhs_val) {
         lhs_val = lhs_val - ps::integer { 1 };
     });
     return lhs;

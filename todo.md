@@ -3,10 +3,12 @@
 - [ ] clean up code
 - [ ] various TODO's in code
 - [ ] enforce type checking
-  - [ ] when assigning to variables
+  - [X] when assigning to variables
   - [ ] when passing function parameters
   - [ ] when initializing struct members
   - [ ] default initializers for struct members
+  - [ ] type checking between different structure types
+  - [ ] appending different types to list
 - [X] error reporting
 - [ ] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types
