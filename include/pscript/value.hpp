@@ -29,6 +29,7 @@ enum class type {
 };
 
 bool may_cast(type from, type to);
+std::string_view type_str(type t);
 
 template<typename T>
 class value_storage {
@@ -41,7 +42,17 @@ public:
 
     }
 
-    value_storage(value_storage const& rhs) : val(rhs.value) {
+    template<typename U> requires (!std::same_as<T, U> && std::convertible_to<U, T>)
+    explicit value_storage(U const& v) : val(v) {
+
+    }
+
+    template<typename U> requires (!std::same_as<T, U> && !std::convertible_to<U, T>)
+    explicit value_storage(U const& v) {
+        throw std::runtime_error("invalid cast");
+    }
+
+    value_storage(value_storage const& rhs) : val(rhs.val) {
 
     }
 
@@ -577,6 +588,9 @@ public:
     template<typename T>
     T cast() const;
 
+    // Effectively changes a value's type to a new type, but only if the cast is allowed.
+    void cast_this(ps::type new_type);
+
     friend std::ostream& operator<<(std::ostream& out, value const& v);
 
     void on_destroy();
@@ -593,6 +607,40 @@ private:
     std::shared_ptr<int> refcount = nullptr;
     bool is_ref = false;
 };
+
+template<typename F>
+void visit_type(ps::type t, F&& callable) {
+    switch(t) {
+        case type::null:
+            break;
+        case type::integer:
+            callable.template operator()<ps::integer>();
+            break;
+        case type::uint:
+            callable.template operator()<ps::uint>();
+            break;
+        case type::real:
+            callable.template operator()<ps::real>();
+            break;
+        case type::boolean:
+            callable.template operator()<ps::boolean>();
+            break;
+        case type::str:
+            callable.template operator()<ps::str>();
+            break;
+        case type::list:
+            callable.template operator()<ps::list>();
+            break;
+        case type::structure:
+            callable.template operator()<ps::structure>();
+            break;
+        case type::external:
+            callable.template operator()<ps::external>();
+            break;
+        default:
+            break;
+    }
+}
 
 template<typename F>
 void visit_value(value& v, F&& callable) {

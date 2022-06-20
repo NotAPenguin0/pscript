@@ -161,7 +161,7 @@ TEST_CASE("script expression parser", "[script]") {
         ps::value& y = ctx.get_variable_value("y");
         ps::value& z = ctx.get_variable_value("z");
         CHECK(static_cast<int const&>(y) == 5);
-        CHECK(static_cast<int const&>(z) == 4.4f);
+        CHECK(static_cast<float const&>(z) == 4.4f);
     }
 
     SECTION("basic operations") {
@@ -900,8 +900,11 @@ TEST_CASE("type checking") {
     SECTION("function parameters") {
         std::string source = R"(
             fn f(a: int, b: float) -> void {
-
+                __print(a);
+                __print(b);
             }
+
+            f("abc", 4.7); // should throw a TypeError
         )";
 
         ps::script script(source, ctx);

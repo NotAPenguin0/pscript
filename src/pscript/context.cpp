@@ -759,8 +759,18 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
         PLIB_UNREACHABLE();
     }
 
-    // create variables with function arguments in call scope
-    for (size_t i = 0; i < arguments.size(); ++i) {
+    // create variables with function arguments in call scope and execute type check for each of them
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+        ps::type const given_type = arguments[i].get_type();
+        ps::type const expected_type = func->params[i].type;
+        if (!may_cast(given_type, expected_type)) {
+            report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
+                + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
+        }
+        // cast is allowed, so we will set the argument value to the value cast to destination type (only if they are different)
+        if (given_type != expected_type && expected_type != ps::type::any) {
+            arguments[i].cast_this(expected_type);
+        }
         ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), func_scope);
     }
 }

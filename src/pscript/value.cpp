@@ -12,16 +12,46 @@
 namespace ps {
 
 bool may_cast(type from, type to) {
+    if (to == ps::type::any) return true;
+    if (from == ps::type::any) return true;
+
+    if (from == to) return true;
     if (from == ps::type::null) return false;
     if (from == ps::type::structure) return false;
     if (from == ps::type::list) return false;
     if (from == ps::type::str) return false;
     if (from == ps::type::external) return false;
 
-    if (from == ps::type::any) return true;
     if (from == ps::type::integer || from == ps::type::real || from == ps::type::uint || from == ps::type::boolean) {
         if (to == ps::type::integer || to == ps::type::real || to == ps::type::uint || to == ps::type::boolean) return true;
         else return false;
+    }
+
+    PLIB_UNREACHABLE();
+}
+
+std::string_view type_str(type t) {
+    switch(t) {
+        case type::null:
+            return "null";
+        case type::any:
+            return "any";
+        case type::integer:
+            return "int";
+        case type::uint:
+            return "uint";
+        case type::real:
+            return "float";
+        case type::boolean:
+            return "bool";
+        case type::str:
+            return "str";
+        case type::list:
+            return "list";
+        case type::structure:
+            return "struct";
+        case type::external:
+            return "external";
     }
 
     PLIB_UNREACHABLE();
@@ -397,6 +427,14 @@ ps::integer const& value::int_value() const {
 
 ps::real const& value::real_value() const {
     return memory->get<ps::real>(ptr);
+}
+
+void value::cast_this(ps::type new_type) {
+    if (!may_cast(new_type, tpe)) throw std::runtime_error("TypeError: Invalid cast_this() call");
+    visit_type(new_type, [this]<typename T>() {
+        T new_val = cast<T>();
+        *this = value::from(*memory, new_val.value());
+    });
 }
 
 std::ostream& operator<<(std::ostream& out, value const& v) {

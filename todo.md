@@ -4,7 +4,7 @@
 - [ ] various TODO's in code
 - [ ] enforce type checking
   - [X] when assigning to variables
-  - [ ] when passing function parameters
+  - [X] when passing function parameters
   - [ ] when initializing struct members
   - [ ] default initializers for struct members
   - [ ] type checking between different structure types
