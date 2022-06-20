@@ -28,6 +28,8 @@ enum class type {
     external // stores an additional type member for its contained type.
 };
 
+bool may_cast(type from, type to);
+
 template<typename T>
 class value_storage {
 public:

@@ -875,3 +875,25 @@ TEST_CASE("error reporting") {
         ctx.execute(script, exec);
     }
 }
+
+TEST_CASE("type checking") {
+    constexpr size_t memsize = 1024;
+    ps::context ctx(memsize);
+
+    ps::execution_context exec;
+
+    SECTION("variable assignment") {
+        std::string source = R"(
+            import std.io;
+            import std.memory;
+
+            let x = 4;
+            x = 4.4;
+            std.io.print(x);
+            x = "abc"; // TypeError
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+}

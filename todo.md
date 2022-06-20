@@ -6,6 +6,7 @@
   - [ ] when assigning to variables
   - [ ] when passing function parameters
   - [ ] when initializing struct members
+  - [ ] default initializers for struct members
 - [X] error reporting
 - [ ] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types

@@ -7,7 +7,25 @@
 #include <fmt/format.h>
 #include <fmt/args.h>
 
+#include <plib/macros.hpp>
+
 namespace ps {
+
+bool may_cast(type from, type to) {
+    if (from == ps::type::null) return false;
+    if (from == ps::type::structure) return false;
+    if (from == ps::type::list) return false;
+    if (from == ps::type::str) return false;
+    if (from == ps::type::external) return false;
+
+    if (from == ps::type::any) return true;
+    if (from == ps::type::integer || from == ps::type::real || from == ps::type::uint || from == ps::type::boolean) {
+        if (to == ps::type::integer || to == ps::type::real || to == ps::type::uint || to == ps::type::boolean) return true;
+        else return false;
+    }
+
+    PLIB_UNREACHABLE();
+}
 
 list_type::list_type(std::vector<ps::value> const& values) {
     storage = values;
@@ -168,6 +186,11 @@ value::value(value const& rhs) {
 
 value& value::operator=(value const& rhs) {
     if (&rhs != this) {
+        // First do a type check
+        if (tpe != ps::type::null && tpe != rhs.tpe && !may_cast(rhs.tpe, tpe)) {
+            throw std::runtime_error("TypeError: Invalid cast.");
+        }
+
         // destroy old value
         on_destroy();
 
