@@ -88,7 +88,7 @@ public:
     [[nodiscard]] ps::memory_pool const& memory() const noexcept;
 
     /**
-     * @brief Dumps memory to stdout
+     * @brief Dumps memory to exec_ctx.out
      */
     [[maybe_unused]] void dump_memory() const noexcept;
 

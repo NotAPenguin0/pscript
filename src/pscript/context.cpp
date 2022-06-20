@@ -117,7 +117,7 @@ function_ext <- 'extern fn ' identifier parens_open parameter_list? parens_close
 # fn my_function(param1: typename, param2: typename) -> return_type { function_body }
 function_def <- 'fn ' identifier parens_open parameter_list? parens_close arrow typename space compound
 
-builtin_function <- '__print' / '__readln' / '__time' / '__ref'
+builtin_function <- '__' identifier
 
 # ================= structs =================
 
@@ -245,9 +245,12 @@ ps::memory_pool const& context::memory() const noexcept {
 }
 
 [[maybe_unused]] void context::dump_memory() const noexcept {
-    auto print = [this](ps::pointer ptr) {
+    if (!exec_ctx.out) return;
+    auto& out = *exec_ctx.out;
+    out << std::hex;
+    auto print = [this, &out](ps::pointer ptr) {
         auto const v = static_cast<uint8_t>(mem[ptr]);
-        printf("%02X", v);
+        out << v;
     };
 
     for (auto it = mem.begin(); it != mem.end(); it += 32) {
@@ -257,10 +260,12 @@ ps::memory_pool const& context::memory() const noexcept {
             print(it + i + 1);
             print(it + i + 2);
             print(it + i + 3);
-            printf(" ");
+            out << " ";
         }
-        printf("\n");
+        out << "\n";
     }
+
+    out << std::endl << std::dec;
 }
 
 peg::parser const& context::parser() const noexcept {
@@ -314,6 +319,7 @@ ps::value& context::get_variable_value(std::string const& name, peg::Ast const* 
 void context::execute(ps::script const& script, ps::execution_context exec) {
     try {
         std::shared_ptr<peg::Ast> const& ast = script.ast();
+        if (!ast) throw std::runtime_error("Invalid syntax");
         exec_ctx = std::move(exec);
         execute(ast.get(), nullptr); // start execution in global scope
     } catch(std::exception const& e) {
@@ -870,14 +876,15 @@ ps::value context::evaluate_string_member_function(std::string_view name, ps::va
 }
 
 ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
-    if (name == "__ref") {
+    if (name == "ref") {
         auto arguments = evaluate_argument_list(node, scope, true);
         return arguments[0]; // calling evaluate_argument_list with ref = true gives us a reference
+        // TODO: check arg count!
     }
     auto arguments = evaluate_argument_list(node, scope);
     // builtin function: print
     // TODO: possibly allow variadics? (up to maximum amount)
-    if (name == "__print") {
+    if (name == "print") {
         if (arguments.empty()) {
             report_error(node, "In call to __print(): expected exactly one argument.");
             PLIB_UNREACHABLE();
@@ -886,12 +893,17 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
         *exec_ctx.out << to_print << std::endl;
         // success
         return ps::value::from(memory(), 0);
-    } else if (name == "__readln") {
+    } else if (name == "readln") {
         std::string input {};
         std::getline(*exec_ctx.in, input);
         return ps::value::from(memory(), string_type { input });
-    } else if (name == "__time") {
+    } else if (name == "time") {
         return ps::value::from(memory(), (unsigned int)std::time(nullptr));
+    } else if (name == "dump") {
+        dump_memory();
+    } else {
+        report_error(node, "Invalid builtin function: "s + name.data() + ".");
+        PLIB_UNREACHABLE();
     }
 
     return ps::value::null();

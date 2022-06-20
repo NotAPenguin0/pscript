@@ -544,6 +544,17 @@ TEST_CASE("stdlib") {
         CHECK(ctx.get_variable_value("x").int_value().value() == 3);
         CHECK(ctx.get_variable_value("y").int_value().value() == 4);
     }
+
+    SECTION("memory") {
+        std::string source = R"(
+            import std.memory;
+
+            std.memory.dump();
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
 }
 
 TEST_CASE("structs") {
@@ -713,6 +724,15 @@ TEST_CASE("error reporting") {
     ps::context ctx(memsize);
 
     ps::execution_context exec;
+
+    SECTION("invalid syntax") {
+        std::string source = R"(
+            let x =;
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
 
     SECTION("undeclared variable") {
         std::string source = R"(

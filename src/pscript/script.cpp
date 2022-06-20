@@ -9,7 +9,9 @@ script::script(std::string source, ps::context& ctx) : original_source(std::move
     // Parse script into its AST.
     peg::parser const& parser = ctx.parser();
     parser.parse(original_source, peg_ast);
-    peg_ast = parser.optimize_ast(peg_ast);
+    if (peg_ast) {
+        peg_ast = parser.optimize_ast(peg_ast);
+    }
 }
 
 std::string const& script::source() const {
