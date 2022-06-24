@@ -16,6 +16,7 @@ bool may_cast(type from, type to) {
     if (from == ps::type::any) return true;
 
     if (from == to) return true;
+    if (to == ps::type::null) return false;
     if (from == ps::type::null) return false;
     if (from == ps::type::structure) return false;
     if (from == ps::type::list) return false;

@@ -140,6 +140,8 @@ private:
         };
         // parameters this function was declared with
         std::vector<parameter> params;
+
+        ps::type return_type;
     };
 
     struct struct_description {
@@ -149,6 +151,7 @@ private:
         struct member {
             std::string name;
             ps::value default_value;
+            ps::type type {};
         };
 
         std::vector<member> members;
@@ -216,6 +219,9 @@ private:
     ps::value evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref = false);
     ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
+
+    // returns true if cast was successful, false otherwise
+    bool try_cast(ps::value& val, ps::type from, ps::type to);
 
     static void report_error(peg::Ast const* node, std::string_view message) ;
 };

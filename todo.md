@@ -5,11 +5,11 @@
 - [ ] enforce type checking
   - [X] when assigning to variables
   - [X] when passing function parameters
-  - [ ] when initializing struct members
-  - [ ] default initializers for struct members
+  - [X] when initializing struct members
+  - [X] default initializers for struct members
   - [ ] type checking between different structure types
   - [ ] appending different types to list
-  - [ ] function return type checking
+  - [X] function return type checking
 - [X] error reporting
 - [ ] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types

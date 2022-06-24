@@ -141,7 +141,7 @@ module_name <- identifier
 
 # ================= return statements =================
 
-return <- 'return ' expression? { no_ast_opt }
+return <- 'return' expression? { no_ast_opt }
 
 # ================= variable declarations =================
 

@@ -156,7 +156,7 @@ module_name <- identifier
 
 # ================= return statements =================
 
-return <- 'return ' expression? { no_ast_opt }
+return <- 'return' expression? { no_ast_opt }
 
 # ================= variable declarations =================
 
@@ -385,7 +385,13 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         call_stack.top().return_val = ps::value::null();
         // first child node of a return statement is the return expression.
         if (!node->nodes.empty()) {
-            call_stack.top().return_val = evaluate_expression(node->nodes[0].get(), scope);
+            auto& call = call_stack.top();
+            ps::value return_value = evaluate_expression(node->nodes[0].get(), scope);
+            if (!try_cast(return_value, return_value.get_type(), call.func->return_type)) {
+                report_error(node, "In function "s + call.func->name.data() + ": cannot cast return value from "s + type_str(return_value.get_type()).data() +
+                    " to "s + type_str(call.func->return_type).data() + ".");
+            }
+            call.return_val = std::move(return_value);
         }
     }
 
@@ -478,6 +484,7 @@ void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
 void context::evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix) {
     peg::Ast const* identifier = find_child_with_type(node, "identifier");
     peg::Ast const* params = find_child_with_type(node, "parameter_list");
+    peg::Ast const* ret_type = find_child_with_type(node, "typename");
 
     // If a function is external, this node will be null.
     // We will use this to test for an external function on the call site, and
@@ -485,6 +492,7 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     peg::Ast const* content = find_child_with_type(node, "compound");
     function func {};
     func.node = content;
+    func.return_type = evaluate_type(ret_type);
     if (params) {
         for (auto const& child : params->nodes) {
             if (!node_is_type(child.get(), "parameter")) continue;
@@ -494,7 +502,6 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
             func.params.push_back(function::parameter{ .name = param_name->token_to_string(), .type = type });
         }
     }
-    // TODO: return type information?
     std::string name = namespace_prefix + identifier->token_to_string();
     auto it = functions.insert({name, std::move(func)});
     // set key reference
@@ -512,10 +519,18 @@ void context::evaluate_struct_definition(peg::Ast const* node, std::string const
 
             peg::Ast const* name = find_child_with_type(field.get(), "identifier");
             peg::Ast const* initializer = find_child_with_type(field.get(), "struct_initializer");
+            peg::Ast const* field_type = find_child_with_type(field.get(), "typename");
             peg::Ast const* init_expression = find_child_with_type(initializer, "expression");
+            ps::value init_value = evaluate_expression(init_expression, nullptr);
+            ps::type const type = evaluate_type(field_type);
+            if (!try_cast(init_value, init_value.get_type(), type)) {
+                report_error(field.get(), "In struct initializer for member "s + name->token_to_string() + ": Cannot convert from type "s +
+                    type_str(init_value.get_type()).data() + " to " + type_str(type).data() + ".");
+            }
             struct_description::member field_info {
                 name->token_to_string(),
-                evaluate_expression(init_expression, nullptr)
+                std::move(init_value),
+                type
             };
             info.members.push_back(std::move(field_info));
         }
@@ -537,6 +552,7 @@ ps::type context::evaluate_type(peg::Ast const* node) {
         if (name == "str") return ps::type::str;
         if (name == "uint") return ps::type::uint;
         if (name == "bool") return ps::type::boolean;
+        if (name == "void") return ps::type::null;
     }
     // any other type is probably a struct (lole, should check this more thoroughly).
     return ps::type::structure;
@@ -763,13 +779,9 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
     for (std::size_t i = 0; i < arguments.size(); ++i) {
         ps::type const given_type = arguments[i].get_type();
         ps::type const expected_type = func->params[i].type;
-        if (!may_cast(given_type, expected_type)) {
+        if (!try_cast(arguments[i], given_type, expected_type)) {
             report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
                 + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
-        }
-        // cast is allowed, so we will set the argument value to the value cast to destination type (only if they are different)
-        if (given_type != expected_type && expected_type != ps::type::any) {
-            arguments[i].cast_this(expected_type);
         }
         ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), func_scope);
     }
@@ -971,6 +983,13 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
     auto const& struct_def = it->second;
     std::unordered_map<std::string, ps::value> initializers;
     for (int i = 0; i < arguments.size(); ++i) {
+        ps::type given_type = arguments[i].get_type();
+        ps::type expected_type = struct_def.members[i].type;
+        // cast if needed
+        if (!try_cast(arguments[i], given_type, expected_type)) {
+            report_error(node, "In constructor expression for type "s + struct_name + ": Cannot cast argument " + std::to_string(i) + " from type '"s
+                                    + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
+        }
         initializers.insert({ struct_def.members[i].name, std::move(arguments[i]) });
     }
     // add default initializers
@@ -1090,6 +1109,17 @@ ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope,
     }
 
     return ps::value::null();
+}
+
+bool context::try_cast(ps::value& val, ps::type from, ps::type to) {
+    if (!may_cast(from, to)) {
+        return false;
+    }
+    // cast is allowed, so we will set the argument value to the value cast to destination type (only if they are different)
+    if (from != to && to != ps::type::any) {
+        val.cast_this(to);
+    }
+    return true;
 }
 
 void context::report_error(peg::Ast const* node, std::string_view message) {

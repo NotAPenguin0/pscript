@@ -882,6 +882,19 @@ TEST_CASE("type checking") {
 
     ps::execution_context exec;
 
+    SECTION("return statements") {
+        std::string source = R"(
+            fn f() -> int {
+                return "abc"; // TypeError
+            }
+
+            let x = f();
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
     SECTION("variable assignment") {
         std::string source = R"(
             import std.io;
@@ -910,4 +923,29 @@ TEST_CASE("type checking") {
         ps::script script(source, ctx);
         ctx.execute(script, exec);
     }
+
+    SECTION("struct init") {
+        std::string source = R"(
+            struct S {
+                x: int = "abc"; // should throw a TypeError
+            };
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("struct constructor") {
+        std::string source = R"(
+            struct S {
+                x: int = 0;
+            };
+
+            let s = S { "abc" };
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
 }
