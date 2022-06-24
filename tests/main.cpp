@@ -368,14 +368,13 @@ TEST_CASE("lists") {
             let my_list = [1, 2, 3];
             my_list.append(4);
             my_list.append(5);
-            my_list.append(6.6);
             __print(my_list);
         )";
 
         ps::script script(source, ctx);
         ctx.execute(script, exec);
 
-        CHECK(output_equal(exec, "[1, 2, 3, 4, 5, 6.6]\n"));
+        CHECK(output_equal(exec, "[1, 2, 3, 4, 5]\n"));
     }
 
     SECTION("indexing") {
