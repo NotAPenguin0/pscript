@@ -65,9 +65,12 @@ list_type::list_type(std::vector<ps::value> const& values) {
     }
 }
 
+using namespace std::literals::string_literals;
+
 void list_type::append(value const& val) {
-    // TODO: Check stored type against pushed value?
-    // Note that this would be hard to guarantee with the reference in get().
+    if (val.get_type() != stored_type) {
+        throw std::runtime_error("TypeError: List stores objects of type "s + type_str(stored_type).data() + ", cannot insert object of type "s + type_str(val.get_type()).data());
+    }
     storage.push_back(val);
 }
 
@@ -155,15 +158,17 @@ std::ostream& operator<<(std::ostream& out, string_type const& str) {
     return out << str.storage;
 }
 
-struct_type::struct_type(std::unordered_map<std::string, ps::value> const& initializers) {
+struct_type::struct_type(std::string const& name, std::unordered_map<std::string, ps::value> const& initializers) {
+    this->name = name;
     members = initializers;
 }
 
 std::string struct_type::to_string() const {
     std::ostringstream oss {};
-    oss << "{\n";
-    for (auto const& [name, value] : members) {
-        oss << '\t' << name << ": " << value << '\n';
+    oss << name;
+    oss << " {\n";
+    for (auto const& [field_name, value] : members) {
+        oss << '\t' << field_name << ": " << value << '\n';
     }
     oss << "}";
     return oss.str();
@@ -175,6 +180,10 @@ ps::value& struct_type::access(std::string const& name) {
 
 ps::value const& struct_type::access(std::string const& name) const {
     return members.at(name);
+}
+
+[[nodiscard]] std::string const& struct_type::type_name() const {
+    return name;
 }
 
 std::ostream& operator<<(std::ostream& out, struct_type const& s) {
@@ -215,11 +224,22 @@ value::value(value const& rhs) {
     }
 }
 
+using namespace std::literals::string_literals;
+
 value& value::operator=(value const& rhs) {
     if (&rhs != this) {
         // First do a type check
         if (tpe != ps::type::null && tpe != rhs.tpe && !may_cast(rhs.tpe, tpe)) {
-            throw std::runtime_error("TypeError: Invalid cast.");
+            throw std::runtime_error("TypeError: Invalid cast from "s + type_str(rhs.tpe).data() + " to "s + type_str(tpe).data() + ".");
+        }
+
+        // do typecheck for struct types by comparing names
+        if (tpe == ps::type::structure && rhs.tpe == ps::type::structure) {
+            auto& lhs_struct = static_cast<ps::structure&>(*this);
+            auto const& rhs_struct = static_cast<ps::structure const&>(rhs);
+            if (lhs_struct->type_name() != rhs_struct->type_name()) {
+                throw std::runtime_error("TypeError: Invalid cast from "s + lhs_struct->type_name() + " to "s + rhs_struct->type_name() + ".");
+            }
         }
 
         // destroy old value

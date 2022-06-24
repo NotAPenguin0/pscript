@@ -137,11 +137,13 @@ private:
         struct parameter {
             std::string name {};
             ps::type type {};
+            std::string type_name {}; // if type is a struct, stores the structs name.
         };
         // parameters this function was declared with
         std::vector<parameter> params;
 
         ps::type return_type;
+        std::string return_type_name {}; // if type is a struct, stores the structs name.
     };
 
     struct struct_description {
@@ -152,6 +154,7 @@ private:
             std::string name;
             ps::value default_value;
             ps::type type {};
+            std::string type_name {}; // if type is a struct, stores the structs name.
         };
 
         std::vector<member> members;
@@ -189,6 +192,7 @@ private:
     static bool node_is_type(peg::Ast const* node, std::string_view type) noexcept;
 
     static ps::type evaluate_type(peg::Ast const* node);
+    static std::string evaluate_type_name(peg::Ast const* node);
 
     void evaluate_declaration(peg::Ast const* node, block_scope* scope);
     void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");

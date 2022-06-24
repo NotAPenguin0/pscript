@@ -391,6 +391,15 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
                 report_error(node, "In function "s + call.func->name.data() + ": cannot cast return value from "s + type_str(return_value.get_type()).data() +
                     " to "s + type_str(call.func->return_type).data() + ".");
             }
+
+            if (call.func->return_type == ps::type::structure) {
+                auto const& name = static_cast<ps::structure const&>(return_value)->type_name();
+                if (name != call.func->return_type_name) {
+                    report_error(node, "In function "s + call.func->name.data() + ": cannot cast return value from "s + name +
+                                       " to "s + call.func->return_type_name + ".");
+                }
+            }
+
             call.return_val = std::move(return_value);
         }
     }
@@ -493,13 +502,20 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     function func {};
     func.node = content;
     func.return_type = evaluate_type(ret_type);
+    if (func.return_type == ps::type::structure) {
+        func.return_type_name = evaluate_type_name(ret_type);
+    }
     if (params) {
         for (auto const& child : params->nodes) {
             if (!node_is_type(child.get(), "parameter")) continue;
             peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
             peg::Ast const* param_type = find_child_with_type(child.get(), "typename");
             ps::type const type = evaluate_type(param_type);
-            func.params.push_back(function::parameter{ .name = param_name->token_to_string(), .type = type });
+            std::string type_name {};
+            if (type == ps::type::structure) {
+                type_name = evaluate_type_name(param_type);
+            }
+            func.params.push_back(function::parameter{ .name = param_name->token_to_string(), .type = type, .type_name = type_name });
         }
     }
     std::string name = namespace_prefix + identifier->token_to_string();
@@ -523,14 +539,28 @@ void context::evaluate_struct_definition(peg::Ast const* node, std::string const
             peg::Ast const* init_expression = find_child_with_type(initializer, "expression");
             ps::value init_value = evaluate_expression(init_expression, nullptr);
             ps::type const type = evaluate_type(field_type);
+            std::string type_name {};
+            if (type == ps::type::structure) {
+                type_name = evaluate_type_name(field_type);
+            }
             if (!try_cast(init_value, init_value.get_type(), type)) {
                 report_error(field.get(), "In struct initializer for member "s + name->token_to_string() + ": Cannot convert from type "s +
                     type_str(init_value.get_type()).data() + " to " + type_str(type).data() + ".");
             }
+
+            if (type == ps::type::structure) {
+                auto const& other_name = static_cast<ps::structure const&>(init_value)->type_name();
+                if (type_name != other_name) {
+                    report_error(field.get(), "In struct initializer for member "s + name->token_to_string() + ": Cannot convert from type "s +
+                                              other_name + " to " + type_name + ".");
+                }
+            }
+
             struct_description::member field_info {
                 name->token_to_string(),
                 std::move(init_value),
-                type
+                type,
+                type_name
             };
             info.members.push_back(std::move(field_info));
         }
@@ -556,6 +586,12 @@ ps::type context::evaluate_type(peg::Ast const* node) {
     }
     // any other type is probably a struct (lole, should check this more thoroughly).
     return ps::type::structure;
+}
+
+std::string context::evaluate_type_name(peg::Ast const* node) {
+    // TODO: namespace support
+    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    return identifier->token_to_string();
 }
 
 void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
@@ -783,6 +819,14 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
             report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
                 + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
         }
+        // additional type check
+        if (expected_type == ps::type::structure) {
+            auto const& name = static_cast<ps::structure const&>(arguments[i])->type_name();
+            if (name != func->params[i].type_name) {
+                report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
+                                        + name + "' to '" + func->params[i].type_name + "'.");
+            }
+        }
         ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), func_scope);
     }
 }
@@ -990,6 +1034,13 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
             report_error(node, "In constructor expression for type "s + struct_name + ": Cannot cast argument " + std::to_string(i) + " from type '"s
                                     + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
         }
+        if (expected_type == ps::type::structure) {
+            auto const& name = static_cast<ps::structure const&>(arguments[i])->type_name();
+            if (name != struct_def.members[i].type_name) {
+                report_error(node, "In constructor expression for type "s + struct_name + ": Cannot cast argument " + std::to_string(i) + " from type '"s
+                                   + name + "' to '" + struct_def.members[i].type_name + "'.");
+            }
+        }
         initializers.insert({ struct_def.members[i].name, std::move(arguments[i]) });
     }
     // add default initializers
@@ -997,7 +1048,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         initializers.insert({struct_def.members[j].name, struct_def.members[j].default_value});
     }
 
-    return ps::value::from(memory(), ps::struct_type { initializers });
+    return ps::value::from(memory(), ps::struct_type { struct_name, initializers });
 }
 
 ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {

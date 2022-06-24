@@ -449,7 +449,8 @@ private:
 class struct_type {
 public:
     struct_type() = default;
-    explicit struct_type(std::unordered_map<std::string, ps::value> const& initializers);
+    // name is used to identify different struct types
+    struct_type(std::string const& name, std::unordered_map<std::string, ps::value> const& initializers);
     struct_type(struct_type const&) = default;
     struct_type(struct_type&&) noexcept = default;
     struct_type& operator=(struct_type const&) = default;
@@ -460,6 +461,8 @@ public:
     [[nodiscard]] ps::value& access(std::string const& name);
     [[nodiscard]] ps::value const& access(std::string const& name) const;
 
+    [[nodiscard]] std::string const& type_name() const;
+
     friend std::ostream& operator<<(std::ostream& out, string_type const& str);
 
     template<typename T>
@@ -469,6 +472,7 @@ public:
 
 private:
     std::unordered_map<std::string, ps::value> members;
+    std::string name;
 };
 
 struct external_type {

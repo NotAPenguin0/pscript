@@ -948,4 +948,34 @@ TEST_CASE("type checking") {
         ctx.execute(script, exec);
     }
 
+    SECTION("different struct types") {
+        std::string source = R"(
+            struct S {
+                x: int = 0;
+            };
+
+            struct T {
+                y: str = "";
+            };
+
+            fn takes_s(x: S) -> void {
+
+            }
+
+            takes_s(T {});
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
+
+    SECTION("list stored type") {
+        std::string source = R"(
+            let l = [1, 2, 3];
+            l.append(3.3); // TypeError
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script, exec);
+    }
 }

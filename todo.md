@@ -2,13 +2,13 @@
   - [ ] remove all string comparisons (possibly just hash strings?)
 - [ ] clean up code
 - [ ] various TODO's in code
-- [ ] enforce type checking
+- [X] enforce type checking
   - [X] when assigning to variables
   - [X] when passing function parameters
   - [X] when initializing struct members
   - [X] default initializers for struct members
-  - [ ] type checking between different structure types
-  - [ ] appending different types to list
+  - [X] type checking between different structure types
+  - [X] appending different types to list
   - [X] function return type checking
 - [X] error reporting
 - [ ] documentation/tutorial on how to use
