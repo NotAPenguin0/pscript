@@ -223,7 +223,7 @@ private:
     ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
 
     // returns true if cast was successful, false otherwise
-    bool try_cast(ps::value& val, ps::type from, ps::type to);
+    static bool try_cast(ps::value& val, ps::type from, ps::type to);
 
     static void report_error(peg::Ast const* node, std::string_view message) ;
 };

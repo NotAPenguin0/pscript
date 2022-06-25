@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
+
 #include <pscript/context.hpp>
 
 #include <peglib.h>
@@ -8,6 +11,7 @@
 #include <iomanip>
 
 #include <plib/macros.hpp>
+#include <fmt/format.h>
 
 namespace ps {
 
@@ -301,7 +305,7 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
 
 ps::variable& context::get_variable(std::string const& name, peg::Ast const* node, block_scope* scope) {
     ps::variable* var = find_variable(name, scope);
-    if (!var) report_error(node, "Variable '" + name + "'not declared in current scope.");
+    if (!var) report_error(node, fmt::format("Variable '{}' not declared in current scope.", name));
     else return *var;
 
     PLIB_UNREACHABLE();
@@ -388,15 +392,15 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
             auto& call = call_stack.top();
             ps::value return_value = evaluate_expression(node->nodes[0].get(), scope);
             if (!try_cast(return_value, return_value.get_type(), call.func->return_type)) {
-                report_error(node, "In function "s + call.func->name.data() + ": cannot cast return value from "s + type_str(return_value.get_type()).data() +
-                    " to "s + type_str(call.func->return_type).data() + ".");
+                report_error(node, fmt::format("In function {}: cannot cast return value from '{}' to '{}'.", call.func->name,
+                                               type_str(return_value.get_type()),
+                                               type_str(call.func->return_type)));
             }
 
             if (call.func->return_type == ps::type::structure) {
                 auto const& name = static_cast<ps::structure const&>(return_value)->type_name();
                 if (name != call.func->return_type_name) {
-                    report_error(node, "In function "s + call.func->name.data() + ": cannot cast return value from "s + name +
-                                       " to "s + call.func->return_type_name + ".");
+                    report_error(node, fmt::format("In function {}: cannot cast return value from '{}' to '{}'.", call.func->name, name, call.func->return_type_name));
                 }
             }
 
@@ -544,15 +548,17 @@ void context::evaluate_struct_definition(peg::Ast const* node, std::string const
                 type_name = evaluate_type_name(field_type);
             }
             if (!try_cast(init_value, init_value.get_type(), type)) {
-                report_error(field.get(), "In struct initializer for member "s + name->token_to_string() + ": Cannot convert from type "s +
-                    type_str(init_value.get_type()).data() + " to " + type_str(type).data() + ".");
+                report_error(field.get(), fmt::format("In struct initializer for member {}: Cannot convert from type '{}' to '{}'.", name->token_to_string(),
+                                                      type_str(init_value.get_type()), type_str(type)));
+                PLIB_UNREACHABLE();
             }
 
             if (type == ps::type::structure) {
                 auto const& other_name = static_cast<ps::structure const&>(init_value)->type_name();
                 if (type_name != other_name) {
-                    report_error(field.get(), "In struct initializer for member "s + name->token_to_string() + ": Cannot convert from type "s +
-                                              other_name + " to " + type_name + ".");
+                    report_error(field.get(), fmt::format("In struct initializer for member {}: Cannot convert from type '{}' to '{}'.",
+                                                          name->token_to_string(), other_name, type_name));
+                    PLIB_UNREACHABLE();
                 }
             }
 
@@ -613,7 +619,7 @@ void context::evaluate_extern_variable(peg::Ast const* node, std::string const& 
     }
 
     if (!external_ptr) {
-        report_error(node, "External variable '" + name + "' not found in extern library.");
+        report_error(node, fmt::format("External variable '{}' not found in extern library.", name));
         PLIB_UNREACHABLE();
     }
     ps::type stored_type = evaluate_type(type);
@@ -653,7 +659,7 @@ void context::evaluate_import(peg::Ast const* node) {
     {
         std::ifstream in {filepath}; // TODO: pass this stream to read_script()
         if (!in.is_open()) {
-            report_error(node, "Module " + filepath + " not found.");
+            report_error(node, fmt::format("Module '{}' not found.", filepath));
             PLIB_UNREACHABLE();
         }
     }
@@ -767,7 +773,7 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     if (op_str == "&=") return *value &= right;
     if (op_str == "%=") return *value %= right;
 
-    else report_error(op, "Operator '" + op_str + "' not implemented.");
+    else report_error(op, fmt::format("Operator '{}' not implemented", op_str));
 
     PLIB_UNREACHABLE();
 }
@@ -805,9 +811,7 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
     if (arguments.empty()) return;
 
     if (arguments.size() != func->params.size()) {
-        report_error(call_node,
-                     "In call to function "s + func->name.data() + ": expected " + std::to_string(func->params.size()) +
-                     " arguments, got " + std::to_string(arguments.size()) + ".");
+        report_error(call_node, fmt::format("In call to function {}: expected {} arguments, got {}", func->name, func->params.size(), arguments.size()));
         PLIB_UNREACHABLE();
     }
 
@@ -816,15 +820,17 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
         ps::type const given_type = arguments[i].get_type();
         ps::type const expected_type = func->params[i].type;
         if (!try_cast(arguments[i], given_type, expected_type)) {
-            report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
-                + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
+            report_error(call_node, fmt::format("In call to function {}: Cannot cast argument {} from type '{}' to '{}'.", func->name, i,
+                                                type_str(given_type), type_str(expected_type)));
+            PLIB_UNREACHABLE();
         }
         // additional type check
         if (expected_type == ps::type::structure) {
             auto const& name = static_cast<ps::structure const&>(arguments[i])->type_name();
             if (name != func->params[i].type_name) {
-                report_error(call_node, "In call to function "s + func->name.data() + ": Cannot cast argument " + std::to_string(i) + " from type '"s
-                                        + name + "' to '" + func->params[i].type_name + "'.");
+                report_error(call_node, fmt::format("In call to function {}: Cannot cast argument {} from type '{}' to '{}'.",
+                                                    func->name, i, name, func->params[i].type_name));
+                PLIB_UNREACHABLE();
             }
         }
         ps::variable& _ = create_variable(func->params[i].name, std::move(arguments[i]), func_scope);
@@ -864,7 +870,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 
     auto it = functions.find(func_name);
     if (it == functions.end()) {
-        report_error(node, "Function '" + func_name + "' is not defined.");
+        report_error(node, fmt::format("Function '{}' is not defined", func_name));
         PLIB_UNREACHABLE();
     }
 
@@ -885,7 +891,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
 
 ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
     if (!exec_ctx.externs) {
-        report_error(node, "No function library bound, cannot evaluate external call to " + name + '.');
+        report_error(node, fmt::format("No function library bound, cannot evaluate external call to '{}'.", name));
         PLIB_UNREACHABLE();
     }
 
@@ -896,7 +902,7 @@ ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* sco
         cur = cur->next.get();
     }
 
-    if (!func) report_error(node, "External function '" + name + "' not found in extern library.");
+    if (!func) report_error(node, fmt::format("External function '{}' not found in extern library.", name));
     auto args = evaluate_argument_list(node, scope);
     if (args.size() > 8) report_error(node, "Unable to do an external call with more than 8 arguments.");
     if (args.empty()) return func->call();
@@ -925,7 +931,7 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
     } else if (name == "size") {
         return ps::value::from(memory(), (int)static_cast<ps::list&>(val)->size());
     } else {
-        report_error(node, "Unknown list member function: "s + name.data() + "."s);
+        report_error(node, fmt::format("Unknown list member function: '{}'.", name));
         PLIB_UNREACHABLE();
     }
 
@@ -979,7 +985,7 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     } else if (name == "dump") {
         dump_memory();
     } else {
-        report_error(node, "Invalid builtin function: "s + name.data() + ".");
+        report_error(node, fmt::format("Invalid builtin function: '{}'.", name));
         PLIB_UNREACHABLE();
     }
 
@@ -1004,7 +1010,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         } else if (name == "uint") {
             if (arguments.empty()) return ps::value::from(memory(), unsigned {});
             else return ps::value::from(memory(), arguments[0].cast<unsigned int>());
-        } else report_error(node, "Cast to type '" + name + "' is not implemented or not supported.");
+        } else report_error(node, fmt::format("Cast to type '{}' is not implemented or not supported.", name));
         PLIB_UNREACHABLE();
     }
     std::string namespace_name {};
@@ -1021,7 +1027,7 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
     std::string struct_name = namespace_name + name->token_to_string();
     auto it = structs.find(struct_name);
     if (it == structs.end()) {
-        report_error(node, "Struct '" + struct_name + "' not defined in current scope.");
+        report_error(node, fmt::format("Struct '{}' not defined in current scope.", struct_name));
         PLIB_UNREACHABLE();
     }
     auto const& struct_def = it->second;
@@ -1031,14 +1037,16 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         ps::type expected_type = struct_def.members[i].type;
         // cast if needed
         if (!try_cast(arguments[i], given_type, expected_type)) {
-            report_error(node, "In constructor expression for type "s + struct_name + ": Cannot cast argument " + std::to_string(i) + " from type '"s
-                                    + type_str(given_type).data() + "' to '" + type_str(expected_type).data() + "'.");
+            report_error(node, fmt::format("In constructor for type '{}': Cannot cast argument {} from type '{}' to '{}'.",
+                                           struct_name, i, type_str(given_type), type_str(expected_type)));
+            PLIB_UNREACHABLE();
         }
         if (expected_type == ps::type::structure) {
-            auto const& name = static_cast<ps::structure const&>(arguments[i])->type_name();
-            if (name != struct_def.members[i].type_name) {
-                report_error(node, "In constructor expression for type "s + struct_name + ": Cannot cast argument " + std::to_string(i) + " from type '"s
-                                   + name + "' to '" + struct_def.members[i].type_name + "'.");
+            auto const& init_name = static_cast<ps::structure const&>(arguments[i])->type_name();
+            if (init_name != struct_def.members[i].type_name) {
+                report_error(node, fmt::format("In constructor for type '{}': Cannot cast argument {} from type '{}' to '{}'.",
+                                               struct_name, i, init_name, struct_def.members[i].type_name));
+                PLIB_UNREACHABLE();
             }
         }
         initializers.insert({ struct_def.members[i].name, std::move(arguments[i]) });
@@ -1183,3 +1191,5 @@ void context::report_error(peg::Ast const* node, std::string_view message) {
 }
 
 } // namespace ps
+
+#pragma clang diagnostic pop
