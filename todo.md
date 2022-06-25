@@ -11,7 +11,7 @@
   - [X] appending different types to list
   - [X] function return type checking
 - [X] error reporting
-- [ ] documentation/tutorial on how to use
+- [X] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types
 - [X] external functions with no return type
 - [ ] command-line interpreter tool

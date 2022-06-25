@@ -231,7 +231,7 @@ Everything is available with a single `#include <pscript/context.hpp>`. To execu
 script, first load it into a `ps::script` object.
 
 ```cpp
-ps::script source { "let x = 0; let y = 10;" };
+ps::script source { "let x = 0; let y = 10;", ctx };
 ```
 
 To run scripts, you must create a `ps::context` object. This object signifies a single 

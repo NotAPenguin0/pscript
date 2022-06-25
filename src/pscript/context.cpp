@@ -84,7 +84,7 @@ identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
 literal <- boolean / string / number
 number <- (float / integer) literal_suffix?
-literal_suffix <- 'u'
+literal_suffix <- 'u' / 'f'
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
@@ -627,8 +627,7 @@ void context::evaluate_extern_variable(peg::Ast const* node, std::string const& 
     auto& _ = create_variable(name, std::move(val));
 }
 
-static std::string read_script(std::string const& filename) {
-    std::ifstream file {filename};
+static std::string read_script(std::ifstream& file) {
     return std::string { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 }
 
@@ -656,12 +655,10 @@ void context::evaluate_import(peg::Ast const* node) {
         if (in.is_open()) break; // found matching path
     }
 
-    {
-        std::ifstream in {filepath}; // TODO: pass this stream to read_script()
-        if (!in.is_open()) {
-            report_error(node, fmt::format("Module '{}' not found.", filepath));
-            PLIB_UNREACHABLE();
-        }
+    std::ifstream module_file { filepath };
+    if (!module_file.is_open()) {
+        report_error(node, fmt::format("Module '{}' not found.", filepath));
+        PLIB_UNREACHABLE();
     }
 
     // import only if not yet imported
@@ -674,7 +671,7 @@ void context::evaluate_import(peg::Ast const* node) {
     }
 
     // import it
-    imported_scripts.push_back(import_data{ filepath, ps::script {read_script(filepath), *this } });
+    imported_scripts.push_back(import_data{ filepath, ps::script { read_script(module_file), *this } });
     peg::Ast const* ast = imported_scripts.back().script.ast().get();
 
     // build namespace string
@@ -704,6 +701,8 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope, bo
             // Check if last character is a literal
             if (str_repr.back() == 'u') {
                 return ps::value::from(memory(), (unsigned int)std::stoi(str_repr.substr(0, str_repr.size() - 1)));
+            } else if (str_repr.back() == 'f') {
+                return ps::value::from(memory(), (float)std::stof(str_repr.substr(0, str_repr.size() - 1)));
             } else {
                 return ps::value::from(memory(), node->token_to_number<ps::integer::value_type>());
             }

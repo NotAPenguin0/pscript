@@ -618,7 +618,7 @@ TEST_CASE("external functions") {
 
         extern fn lib_a() -> void;
 
-        std.io.print(add(1.1, 2.2));
+        std.io.print(add(1.1, 2.2f));
         print_extern(1000);
         lib_a();
     )";
