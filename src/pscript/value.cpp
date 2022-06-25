@@ -1,10 +1,8 @@
 #include <pscript/value.hpp>
 
 #include <iostream>
-#include <cstdarg>
 #include <sstream>
 
-#include <fmt/format.h>
 #include <fmt/args.h>
 
 #include <plib/macros.hpp>
@@ -110,22 +108,22 @@ static void try_push_arg(arg_store& dyn, T const& value) {
 }
 
 template<>
-void try_push_arg<ps::string_type>(arg_store& dyn, ps::string_type const& value) {
+[[maybe_unused]] void try_push_arg<ps::string_type>(arg_store& dyn, ps::string_type const& value) {
     dyn.push_back(value.representation());
 }
 
 template<>
-void try_push_arg<ps::list_type>(arg_store& dyn, ps::list_type const& value) {
+[[maybe_unused]] void try_push_arg<ps::list_type>(arg_store& dyn, ps::list_type const& value) {
     dyn.push_back(value.to_string());
 }
 
 template<>
-void try_push_arg<ps::struct_type>(arg_store& dyn, ps::struct_type const& value) {
+[[maybe_unused]] void try_push_arg<ps::struct_type>(arg_store& dyn, ps::struct_type const& value) {
     dyn.push_back(value.to_string());
 }
 
 template<>
-void try_push_arg<ps::external_type>(arg_store& dyn, ps::external_type const& value) {
+[[maybe_unused]] void try_push_arg<ps::external_type>(arg_store& dyn, ps::external_type const& value) {
     dyn.push_back(value.pointer());
 }
 
@@ -174,12 +172,12 @@ std::string struct_type::to_string() const {
     return oss.str();
 }
 
-ps::value& struct_type::access(std::string const& name) {
-    return members.at(name);
+ps::value& struct_type::access(std::string const& field_name) {
+    return members.at(field_name);
 }
 
-ps::value const& struct_type::access(std::string const& name) const {
-    return members.at(name);
+ps::value const& struct_type::access(std::string const& field_name) const {
+    return members.at(field_name);
 }
 
 [[nodiscard]] std::string const& struct_type::type_name() const {
@@ -215,7 +213,7 @@ value::value(value const& rhs) {
             refcount = rhs.refcount;
             if (refcount) (*refcount)++;
         } else {
-            visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
+            visit_value(rhs, [this]<typename T>(T const& rhs_val) {
                 ptr = memory->allocate<T>();
                 if (ptr == ps::null_pointer) throw std::bad_alloc();
                 static_cast<T&>(*this) = rhs_val;
@@ -253,7 +251,7 @@ value& value::operator=(value const& rhs) {
             refcount = rhs.refcount;
             if (refcount) (*refcount)++;
         } else {
-            visit_value(rhs, [this, &rhs]<typename T>(T const& rhs_val) {
+            visit_value(rhs, [this]<typename T>(T const& rhs_val) {
                 ptr = memory->allocate<T>();
                 if (ptr == ps::null_pointer) throw std::bad_alloc();
                 static_cast<T&>(*this) = rhs_val;
@@ -426,7 +424,7 @@ ps::value value::ref(ps::value const& rhs) {
     return val;
 }
 
-ps::pointer value::pointer() {
+ps::pointer value::pointer() const {
     return ptr;
 }
 
@@ -434,7 +432,7 @@ ps::type value::get_type() const {
     return tpe;
 }
 
-ps::integer& value::int_value() {
+[[maybe_unused]] ps::integer& value::int_value() {
     return memory->get<ps::integer>(ptr);
 }
 
@@ -442,7 +440,7 @@ ps::real& value::real_value() {
     return memory->get<ps::real>(ptr);
 }
 
-ps::integer const& value::int_value() const {
+[[maybe_unused]] ps::integer const& value::int_value() const {
     return memory->get<ps::integer>(ptr);
 }
 

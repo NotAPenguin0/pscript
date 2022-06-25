@@ -458,8 +458,8 @@ public:
 
     [[nodiscard]] std::string to_string() const;
 
-    [[nodiscard]] ps::value& access(std::string const& name);
-    [[nodiscard]] ps::value const& access(std::string const& name) const;
+    [[nodiscard]] ps::value& access(std::string const& field_name);
+    [[nodiscard]] ps::value const& access(std::string const& field_name) const;
 
     [[nodiscard]] std::string const& type_name() const;
 
@@ -564,7 +564,7 @@ public:
     // construct a value as a reference, regardless of its type.
     static ps::value ref(ps::value const& rhs);
 
-    ps::pointer pointer();
+    ps::pointer pointer() const;
     type get_type() const;
 
     inline bool is_null() const { return tpe == type::null; }

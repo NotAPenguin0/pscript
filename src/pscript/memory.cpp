@@ -1,9 +1,11 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
 #include <pscript/memory.hpp>
 
-#include <cstdlib>
 #include <stdexcept>
 
 #include <plib/bits.hpp>
+#include <plib/macros.hpp>
 
 namespace ps {
 
@@ -162,7 +164,7 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
             return free;
         }
 
-        return false;
+        PLIB_UNREACHABLE();
     }
 }
 
@@ -225,3 +227,4 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
 }
 
 } // namespace ps
+#pragma clang diagnostic pop
