@@ -1,3 +1,3 @@
-# plib
+# pscript
 
-Library with utilities that I commonly use in my projects
+Custom programming language built for scripting plugins in my engine.

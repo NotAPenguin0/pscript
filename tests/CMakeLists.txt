@@ -9,28 +9,28 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(catch2)
 
-add_executable(plib-test main.cpp)
-target_link_libraries(plib-test PRIVATE plib Catch2::Catch2WithMain)
-target_compile_options(plib-test PRIVATE -Wno-macro-redefined -Wno-format)
+add_executable(pscript-test main.cpp)
+target_link_libraries(pscript-test PRIVATE plib Catch2::Catch2WithMain)
+target_compile_options(pscript-test PRIVATE -Wno-macro-redefined -Wno-format)
 
-if (${PLIB_BUILD_PSCRIPT_DEMO_APP})
+if (${PSCRIPT_BUILD_DEMO_APP})
     add_subdirectory("perceptron_demo")
 endif()
 
 file(GLOB_RECURSE MODULE_FILES "../modules/*")
 add_custom_command(
-        TARGET plib-test POST_BUILD
+        TARGET pscript-test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../modules/" ${CMAKE_CURRENT_BINARY_DIR}/pscript-modules
         DEPENDS ${MODULE_FILES}
-        COMMENT "Copying plib modules - tests"
+        COMMENT "Copying pscript modules - tests"
         VERBATIM
 )
 
 file(GLOB_RECURSE SAMPLES "../samples/*")
 add_custom_command(
-        TARGET plib-test POST_BUILD
+        TARGET pscript-test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../samples/" ${CMAKE_CURRENT_BINARY_DIR}/samples
         DEPENDS ${SAMPLES}
-        COMMENT "Copying plib samples - tests"
+        COMMENT "Copying pscript samples - tests"
         VERBATIM
 )
