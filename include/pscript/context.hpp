@@ -19,8 +19,6 @@ namespace peg {
 
 namespace ps {
 
-    // TODO: possibly allow linking multiple function libraries?
-
 /**
  * @brief Interface class for external functions
  */

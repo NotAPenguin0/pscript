@@ -569,11 +569,11 @@ public:
 
     inline bool is_null() const { return tpe == type::null; }
 
-    [[deprecated("use operator T instead")]] ps::integer& int_value();
-    [[deprecated("use operator T instead")]] ps::real& real_value();
+    [[deprecated("use operator T instead"), maybe_unused]] ps::integer& int_value();
+    [[deprecated("use operator T instead"), maybe_unused]] ps::real& real_value();
 
-    [[maybe_unused, deprecated("use operator T instead")]] ps::integer const& int_value() const;
-    [[deprecated("use operator T instead")]] ps::real const& real_value() const;
+    [[deprecated("use operator T instead"), maybe_unused]] ps::integer const& int_value() const;
+    [[deprecated("use operator T instead"), maybe_unused]] ps::real const& real_value() const;
 
     template<typename T>
     explicit operator T&() {
