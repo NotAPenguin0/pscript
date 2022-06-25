@@ -14,8 +14,8 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   message(STATUS "${PROJECT_NAME} is top level")
 endif()
 
-option(PLIB_ENABLE_TESTS "Enable building tests" ${is_root_project})
-option(PLIB_BUILD_PSCRIPT_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
+option(PSCRIPT_ENABLE_TESTS "Enable building tests" ${is_root_project})
+option(PSCRIPT_BUILD_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
 
 if(${PSCRIPT_ENABLE_TESTS})
   add_subdirectory(tests)
@@ -35,6 +35,11 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(plib)
 
+FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt
+)
+FetchContent_MakeAvailable(fmt)
 
 add_library(pscript STATIC)
 target_sources(pscript PRIVATE
@@ -46,7 +51,10 @@ target_sources(pscript PRIVATE
 )
 target_include_directories(pscript PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
 
-target_compile_options(plib PRIVATE "-Wno-format")
+
+target_link_libraries(pscript PUBLIC fmt plib)
+target_include_directories(pscript PUBLIC ${fmt_SOURCE_DIR}/include)
+target_compile_options(pscript PRIVATE "-Wno-format")
 
 # copy over modules to build directory
 file(GLOB_RECURSE MODULE_FILES "modules/*")
