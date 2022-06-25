@@ -24,12 +24,41 @@ namespace ps {
  */
 class extern_library {
 public:
-    virtual plib::erased_function<ps::value>* get_function(std::string const& name) = 0;
-    virtual void* get_variable(std::string const& name) = 0;
+    template<typename C>
+    void add_function(ps::context& ctx, std::string const& name, C&& callable) {
+        functions.insert({name, plib::make_concrete_function<ps::value>(callable, [&ctx](auto x){
+            return ps::value::from(ctx.memory(), x);
+        })});
+    }
 
-    virtual ~extern_library() = default;
+    void add_variable(std::string const& name, void* ptr) {
+        variables.insert({name, ptr});
+    }
+
+    virtual plib::erased_function<ps::value>* get_function(std::string const& name) {
+        auto it = functions.find(name);
+        if (it != functions.end()) return it->second;
+        return nullptr;
+    }
+
+    virtual void* get_variable(std::string const& name) {
+        auto it = variables.find(name);
+        if (it != variables.end()) return it->second;
+        return nullptr;
+    }
+
+    virtual inline ~extern_library() {
+        for (auto& [k, v] : functions) {
+            delete v;
+        }
+        functions.clear();
+    }
 
     std::unique_ptr<extern_library> next = nullptr;
+
+private:
+    std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
+    std::unordered_map<std::string, void*> variables;
 };
 
 struct extern_library_chain_builder {

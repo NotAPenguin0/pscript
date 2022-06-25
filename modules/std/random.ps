@@ -36,6 +36,5 @@ fn rand(state: RandomState, min: uint, max: uint) -> uint {
 }
 
 fn init_rand() -> RandomState {
-    // TODO: struct initializer casts to member type instead of taking parameter type
     return std.random.RandomState { std.time.time() };
 }

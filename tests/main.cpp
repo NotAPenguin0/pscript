@@ -19,43 +19,6 @@ static bool output_equal(ps::execution_context& exec, std::string const& expecte
     return dynamic_cast<std::ostringstream*>(exec.out)->str() == expected;
 }
 
-class extern_library : public ps::extern_library {
-public:
-    template<typename C>
-    void add_function(ps::context& ctx, std::string const& name, C&& callable) {
-        functions.insert({name, plib::make_concrete_function<ps::value>(callable, [&ctx](auto x){
-            return ps::value::from(ctx.memory(), x);
-        })});
-    }
-
-    void add_variable(std::string const& name, void* ptr) {
-        variables.insert({name, ptr});
-    }
-
-    plib::erased_function<ps::value>* get_function(std::string const& name) override {
-        auto it = functions.find(name);
-        if (it != functions.end()) return it->second;
-        return nullptr;
-    }
-
-    void* get_variable(std::string const& name) override {
-        auto it = variables.find(name);
-        if (it != variables.end()) return it->second;
-        return nullptr;
-    }
-
-    ~extern_library() override {
-        for (auto& [k, v] : functions) {
-            delete v;
-        }
-        functions.clear();
-    }
-
-private:
-    std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
-    std::unordered_map<std::string, void*> variables;
-};
-
 float add(float a, float b) {
     return a + b;
 }
@@ -632,11 +595,11 @@ TEST_CASE("external functions") {
     constexpr size_t memsize = 1024;
     ps::context ctx(memsize);
 
-    std::unique_ptr<extern_library> lib = std::make_unique<extern_library>();
+    std::unique_ptr<ps::extern_library> lib = std::make_unique<ps::extern_library>();
     lib->add_function(ctx, "add", &add);
     lib->add_function(ctx, "print_extern", &no_ret_type);
 
-    std::unique_ptr<extern_library> other_lib = std::make_unique<extern_library>();
+    std::unique_ptr<ps::extern_library> other_lib = std::make_unique<ps::extern_library>();
     lib->add_function(ctx, "lib_a", &lib_a);
 
     auto extern_lib = ps::extern_library_chain_builder{}
@@ -671,7 +634,7 @@ TEST_CASE("external types") {
     int my_integer = 10;
     external_struct my_struct { .x = 20 };
 
-    extern_library lib {};
+    ps::extern_library lib {};
     lib.add_variable("my_integer", &my_integer);
     lib.add_variable("my_struct", &my_struct);
     lib.add_function(ctx, "print_int", &print_int);
@@ -786,7 +749,7 @@ TEST_CASE("error reporting") {
     }
 
     SECTION("external call with too many arguments") {
-        auto externs = extern_library {};
+        auto externs = ps::extern_library {};
         externs.add_function(ctx, "foo", &test_f);
         exec.externs = &externs;
 
@@ -801,7 +764,7 @@ TEST_CASE("error reporting") {
     }
 
     SECTION("extern function not found") {
-        auto externs = extern_library {};
+        auto externs = ps::extern_library {};
         exec.externs = &externs;
 
         std::string source = R"(
@@ -815,7 +778,7 @@ TEST_CASE("error reporting") {
     }
 
     SECTION("extern variable not found") {
-        auto externs = extern_library {};
+        auto externs = ps::extern_library {};
         exec.externs = &externs;
 
         std::string source = R"(

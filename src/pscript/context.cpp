@@ -128,12 +128,12 @@ builtin_function <- '__' identifier
 # ================= structs =================
 
 # struct my_struct {
-#   a: float;
+#   a: float = 0.0;
 #   b: int = 0;
 # };
 struct <- 'struct ' identifier space brace_open struct_items brace_close semicolon
 struct_items <- ((struct_item semicolon) / comment)*
-struct_item <- identifier colon typename struct_initializer?
+struct_item <- identifier colon typename struct_initializer
 struct_initializer <- assign expression
 
 # basic statement, control structure such as if/while, or a for loop.
