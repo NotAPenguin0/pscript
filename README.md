@@ -121,7 +121,7 @@ let s = MyStruct { 42, "The meaning of life" };
 let s2 = MyStruct { 42 }; // 'y' is initialized to "abc"
 ```
 
-The initializers assigned to the members in order. You can pass fewer initializers to use
+The initializers are assigned to the members in order. You can pass fewer initializers to use
 the default values for those members. To access a struct member, use the `->` operator.
 
 ```rust
@@ -240,7 +240,7 @@ modules are imported for the entire context, etc. Each context has a memory pool
 size must be specified at creation (in bytes).
 
 ```cpp
-static constexr std::size_t mem_size = 1024 * 1024; // 1 MiB of memory.
+static constexpr std::size_t mem_size = 1024 * 1024; // 1 MiB of memory.
 ps::context ctx { mem_size };
 ```
 
