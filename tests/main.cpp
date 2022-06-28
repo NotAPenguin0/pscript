@@ -50,8 +50,13 @@ void lib_a() {
     std::cout << "lib a\n";
 }
 
-TEST_CASE("INIT") {
-    std::cerr << "TEST" << std::endl;   
+TEST_CASE("create context") {
+    try {
+        constexpr std::size_t memsize = 1024 * 1024;
+        ps::context ctx(memsize);
+    } catch(std::exception const& e) {
+        std::cerr << "Error during testing: " << e.what() << std::endl;  
+    } 
 }
 
 TEST_CASE("pscript context", "[context]") {
@@ -63,19 +68,23 @@ TEST_CASE("pscript context", "[context]") {
     REQUIRE(ctx.memory().size() == memsize);
 
     SECTION("memory access") {
-        ps::memory_pool const& memory = ctx.memory();
-        ps::pointer p = 0;
+        try {
+            ps::memory_pool const& memory = ctx.memory();
+            ps::pointer p = 0;
 
-        CHECK(memory.verify_pointer(p));
-        // Middle of address range
-        CHECK(memory.verify_pointer(p + memsize / 2));
-        // This is out of bounds
-        CHECK(!memory.verify_pointer(p + memsize));
-        // Null pointer can't be valid either
-        CHECK(!memory.verify_pointer(ps::null_pointer));
+            CHECK(memory.verify_pointer(p));
+            // Middle of address range
+            CHECK(memory.verify_pointer(p + memsize / 2));
+            // This is out of bounds
+            CHECK(!memory.verify_pointer(p + memsize));
+            // Null pointer can't be valid either
+            CHECK(!memory.verify_pointer(ps::null_pointer));
 
-        // Verify that memory is zeroed out on construction
-        CHECK(range_equal(memory, memory.begin(), memory.end(), ps::byte{ 0x00 }));
+            // Verify that memory is zeroed out on construction
+            CHECK(range_equal(memory, memory.begin(), memory.end(), ps::byte{ 0x00 }));
+        } catch(std::exception const& e) {
+            std::cerr << "Error during testing: " << e.what() << std::endl;  
+        } 
     }
 
     SECTION("memory allocation") {
