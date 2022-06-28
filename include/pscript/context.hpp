@@ -19,68 +19,7 @@ namespace peg {
 
 namespace ps {
 
-/**
- * @brief Interface class for external functions
- */
-class extern_library {
-public:
-    template<typename C>
-    void add_function(ps::context& ctx, std::string const& name, C&& callable) {
-        functions.insert({name, plib::make_concrete_function<ps::value>(callable, [&ctx](auto x){
-            return ps::value::from(ctx.memory(), x);
-        })});
-    }
-
-    void add_variable(std::string const& name, void* ptr) {
-        variables.insert({name, ptr});
-    }
-
-    virtual plib::erased_function<ps::value>* get_function(std::string const& name) {
-        auto it = functions.find(name);
-        if (it != functions.end()) return it->second;
-        return nullptr;
-    }
-
-    virtual void* get_variable(std::string const& name) {
-        auto it = variables.find(name);
-        if (it != variables.end()) return it->second;
-        return nullptr;
-    }
-
-    virtual inline ~extern_library() {
-        for (auto& [k, v] : functions) {
-            delete v;
-        }
-        functions.clear();
-    }
-
-    std::unique_ptr<extern_library> next = nullptr;
-
-private:
-    std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
-    std::unordered_map<std::string, void*> variables;
-};
-
-struct extern_library_chain_builder {
-private:
-    extern_library* cur_node = nullptr;
-    std::unique_ptr<extern_library> lib;
-public:
-    extern_library_chain_builder& add(std::unique_ptr<extern_library>&& library) {
-        if (lib == nullptr) {
-            lib = std::move(library);
-            cur_node = lib.get();
-        } else {
-            cur_node->next = std::move(library);
-            cur_node = cur_node->next.get();
-        }
-        return *this;
-    }
-
-    std::unique_ptr<extern_library> get() {
-        return std::move(lib);
-    }
-};
+class extern_library;
 
 struct execution_context {
     std::istream* in = &std::cin;
@@ -255,6 +194,70 @@ private:
     static bool try_cast(ps::value& val, ps::type from, ps::type to);
 
     static void report_error(peg::Ast const* node, std::string_view message) ;
+};
+
+
+/**
+ * @brief Interface class for external functions
+ */
+class extern_library {
+public:
+    template<typename C>
+    void add_function(ps::context& ctx, std::string const& name, C&& callable) {
+        functions.insert({name, plib::make_concrete_function<ps::value>(callable, [&ctx](auto x){
+            return ps::value::from(ctx.memory(), x);
+        })});
+    }
+
+    void add_variable(std::string const& name, void* ptr) {
+        variables.insert({name, ptr});
+    }
+
+    virtual plib::erased_function<ps::value>* get_function(std::string const& name) {
+        auto it = functions.find(name);
+        if (it != functions.end()) return it->second;
+        return nullptr;
+    }
+
+    virtual void* get_variable(std::string const& name) {
+        auto it = variables.find(name);
+        if (it != variables.end()) return it->second;
+        return nullptr;
+    }
+
+    virtual inline ~extern_library() {
+        for (auto& [k, v] : functions) {
+            delete v;
+        }
+        functions.clear();
+    }
+
+    std::unique_ptr<extern_library> next = nullptr;
+
+private:
+    std::unordered_map<std::string, plib::erased_function<ps::value>*> functions {};
+    std::unordered_map<std::string, void*> variables;
+};
+
+struct extern_library_chain_builder {
+private:
+    extern_library* cur_node = nullptr;
+    std::unique_ptr<extern_library> lib;
+public:
+    extern_library_chain_builder& add(std::unique_ptr<extern_library>&& library) {
+        if (lib == nullptr) {
+            lib = std::move(library);
+            cur_node = lib.get();
+        } else {
+            cur_node->next = std::move(library);
+            cur_node = cur_node->next.get();
+        }
+        return *this;
+    }
+
+    std::unique_ptr<extern_library> get() {
+        return std::move(lib);
+    }
 };
 
 }
