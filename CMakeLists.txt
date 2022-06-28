@@ -36,6 +36,7 @@ FetchContent_MakeAvailable(peglib)
 FetchContent_Declare(
         plib
         GIT_REPOSITORY https://github.com/NotAPenguin0/plib
+        GIT_TAG fed85fe14d0d2cf83fc649a72bd55a50f28439b2
 )
 
 FetchContent_MakeAvailable(plib)
