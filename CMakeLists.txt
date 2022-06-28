@@ -19,6 +19,8 @@ endif()
 option(PSCRIPT_ENABLE_TESTS "Enable building tests" ${is_root_project})
 option(PSCRIPT_BUILD_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
 
+set(PEGLIB_BUILD_TESTS OFF)
+
 if(${PSCRIPT_ENABLE_TESTS})
   enable_testing()
   add_subdirectory(tests)
