@@ -50,6 +50,10 @@ void lib_a() {
     std::cout << "lib a\n";
 }
 
+TEST_CASE("INIT") {
+    std::cerr << "TEST" << std::endl;   
+}
+
 TEST_CASE("pscript context", "[context]") {
     // create context with 1 MiB memory.
     constexpr std::size_t memsize = 1024 * 1024;
