@@ -6,7 +6,9 @@ project(pscript)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -EHa")
+if (WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -EHa")
+endif()
 
 set(is_root_project OFF)	# indicate if this is the top-level project
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
