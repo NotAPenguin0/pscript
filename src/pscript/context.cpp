@@ -237,7 +237,10 @@ comment <- '//' any '\n'
 using namespace std::literals::string_literals;
 
 context::context(std::size_t mem_size) : mem(mem_size) {
+    std::cout << "creating parser" << std::endl;
     ast_parser = std::make_unique<peg::parser>(grammar);
+    std::cout << "parser created" << std::endl;
+    if (ast_parser == nullptr) throw std::runtime_error("failed to create parser");
     ast_parser->enable_ast();
     ast_parser->enable_packrat_parsing();
 }
