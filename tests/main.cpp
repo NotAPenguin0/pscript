@@ -50,6 +50,10 @@ void lib_a() {
     std::cout << "lib a\n";
 }
 
+TEST_CASE("TEST") {
+    std::cout << "OUTPUT PLS\n" << std::endl;   
+}
+
 TEST_CASE("create context") {
     try {
         constexpr std::size_t memsize = 1024 * 1024;
