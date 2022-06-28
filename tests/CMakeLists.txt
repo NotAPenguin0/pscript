@@ -14,6 +14,7 @@ target_link_libraries(pscript-test PRIVATE pscript Catch2::Catch2WithMain)
 target_compile_options(pscript-test PRIVATE -Wno-macro-redefined -Wno-format)
 
 add_test(
+        NAME pscript-test
         COMMAND pscript-test 
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
