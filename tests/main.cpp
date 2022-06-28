@@ -54,6 +54,7 @@ TEST_CASE("create context") {
     try {
         constexpr std::size_t memsize = 1024 * 1024;
         ps::context ctx(memsize);
+        std::cerr << "BINK BONK" << std::endl;
     } catch(std::exception const& e) {
         std::cerr << "Error during testing: " << e.what() << std::endl;  
     } 
