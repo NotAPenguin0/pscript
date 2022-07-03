@@ -4,5 +4,6 @@ build/
 .cache/
 cmake-build-debug/
 cmake-build-debug-coverage/
+cmake-build-relwithdebinfo/
 cmake-build-release/
 .idea/
