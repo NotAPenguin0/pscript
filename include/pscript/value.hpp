@@ -386,6 +386,94 @@ std::common_type_t<T, U> operator%(arithmetic_type<T> const& lhs, U const& rhs) 
     return lhs.value() % rhs;
 }
 
+class list_type;
+class struct_type;
+class string_type;
+class external_type;
+
+using integer = arithmetic_type<int>;
+using uint = arithmetic_type<unsigned int>;
+using real = arithmetic_type<float>;
+using boolean = eq_comparable<bool>;
+
+/**
+ * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).
+ */
+class value {
+public:
+    value() = default;
+    value(value const& rhs);
+    value& operator=(value const& rhs);
+
+    value(value&& rhs) noexcept;
+    value& operator=(value&& rhs) noexcept;
+
+    ~value();
+
+    // Creates a new value with matching type, allocates memory for it and initializes it.
+
+    static ps::value null();
+    static ps::value from(ps::memory_pool& memory, int v);
+    static ps::value from(ps::memory_pool& memory, unsigned int v);
+    static ps::value from(ps::memory_pool& memory, float v);
+    static ps::value from(ps::memory_pool& memory, bool v);
+    static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::struct_type const& v);
+    static ps::value from(ps::memory_pool& memory, ps::external_type const& v);
+
+    // construct a value as a reference, regardless of its type.
+    static ps::value ref(ps::value const& rhs);
+
+    ps::pointer pointer() const;
+    type get_type() const;
+
+    inline bool is_null() const { return tpe == type::null; }
+
+    [[deprecated("use operator T instead"), maybe_unused]] ps::integer& int_value();
+    [[deprecated("use operator T instead"), maybe_unused]] ps::real& real_value();
+
+    [[deprecated("use operator T instead"), maybe_unused]] ps::integer const& int_value() const;
+    [[deprecated("use operator T instead"), maybe_unused]] ps::real const& real_value() const;
+
+    template<typename T>
+    explicit operator T&() {
+        return memory->get<T>(ptr);
+    }
+
+    template<typename T>
+    explicit operator T const& () const {
+        return memory->get<T>(ptr);
+    }
+
+    inline ps::memory_pool& get_memory() const {
+        return *memory;
+    }
+
+    template<typename T>
+    T cast() const;
+
+    // Effectively changes a value's type to a new type, but only if the cast is allowed.
+    void cast_this(ps::type new_type);
+
+    friend std::ostream& operator<<(std::ostream& out, value const& v);
+
+    void on_destroy();
+
+    inline bool is_reference() const { return is_ref; }
+
+private:
+    mutable ps::memory_pool* memory = nullptr;
+
+    // Pointer to allocated memory for this value.
+    ps::pointer ptr = ps::null_pointer;
+    type tpe{};
+    // if is_ref is true, but refcount is null, this is an uncounted reference and shouldn't be cleaned up;
+    std::shared_ptr<int> refcount = nullptr;
+    bool is_ref = false;
+};
+
+
 // TODO: replace stored vector and string by custom types that use our memory allocator
 
 class list_type {
@@ -509,10 +597,7 @@ private:
     ps::type type;
 };
 
-using integer = arithmetic_type<int>;
-using uint = arithmetic_type<unsigned int>;
-using real = arithmetic_type<float>;
-using boolean = eq_comparable<bool>;
+
 using list = value_storage<list_type>;
 using str = eq_comparable<string_type>;
 using structure = value_storage<struct_type>;
@@ -534,83 +619,6 @@ inline string_type operator+(str const& lhs, str const& rhs) {
 inline bool operator!(boolean const& lhs) {
     return !lhs.value();
 }
-
-/**
- * @brief Represents a typed value. This can be used in the context of a variable (with a name), or as a constant (anonymous).
- */
-class value {
-public:
-    value() = default;
-    value(value const& rhs);
-    value& operator=(value const& rhs);
-
-    value(value&& rhs) noexcept;
-    value& operator=(value&& rhs) noexcept;
-
-    ~value();
-
-    // Creates a new value with matching type, allocates memory for it and initializes it.
-
-    static ps::value null();
-    static ps::value from(ps::memory_pool& memory, int v);
-    static ps::value from(ps::memory_pool& memory, unsigned int v);
-    static ps::value from(ps::memory_pool& memory, float v);
-    static ps::value from(ps::memory_pool& memory, bool v);
-    static ps::value from(ps::memory_pool& memory, ps::list_type const& v);
-    static ps::value from(ps::memory_pool& memory, ps::string_type const& v);
-    static ps::value from(ps::memory_pool& memory, ps::struct_type const& v);
-    static ps::value from(ps::memory_pool& memory, ps::external_type const& v);
-
-    // construct a value as a reference, regardless of its type.
-    static ps::value ref(ps::value const& rhs);
-
-    ps::pointer pointer() const;
-    type get_type() const;
-
-    inline bool is_null() const { return tpe == type::null; }
-
-    [[deprecated("use operator T instead"), maybe_unused]] ps::integer& int_value();
-    [[deprecated("use operator T instead"), maybe_unused]] ps::real& real_value();
-
-    [[deprecated("use operator T instead"), maybe_unused]] ps::integer const& int_value() const;
-    [[deprecated("use operator T instead"), maybe_unused]] ps::real const& real_value() const;
-
-    template<typename T>
-    explicit operator T&() {
-        return memory->get<T>(ptr);
-    }
-
-    template<typename T>
-    explicit operator T const& () const {
-        return memory->get<T>(ptr);
-    }
-
-    inline ps::memory_pool& get_memory() const {
-        return *memory;
-    }
-
-    template<typename T>
-    T cast() const;
-
-    // Effectively changes a value's type to a new type, but only if the cast is allowed.
-    void cast_this(ps::type new_type);
-
-    friend std::ostream& operator<<(std::ostream& out, value const& v);
-
-    void on_destroy();
-
-    inline bool is_reference() const { return is_ref; }
-
-private:
-    mutable ps::memory_pool* memory = nullptr;
-
-    // Pointer to allocated memory for this value.
-    ps::pointer ptr = ps::null_pointer;
-    type tpe{};
-    // if is_ref is true, but refcount is null, this is an uncounted reference and shouldn't be cleaned up;
-    std::shared_ptr<int> refcount = nullptr;
-    bool is_ref = false;
-};
 
 template<typename F>
 void visit_type(ps::type t, F&& callable) {

@@ -7,6 +7,8 @@
 #include <plib/bits.hpp>
 #include <plib/macros.hpp>
 
+#include <cstring>
+
 namespace ps {
 
 memory_pool::memory_pool(std::size_t size) {
