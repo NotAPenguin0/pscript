@@ -2,6 +2,8 @@
 
 Custom programming language built for scripting plugins in my engine.
 
+[![CMake](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml/badge.svg?branch=master)](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml)
+
 ## Documentation
 
 ### 0. Hello, World!
