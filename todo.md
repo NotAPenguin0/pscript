@@ -17,5 +17,6 @@
 - [ ] command-line interpreter tool
 - [ ] debugger
 - [ ] move test suite to full programs loaded from files instead of small snippets
+- [ ] benchmarking suite
 - [ ] variadic arguments? (e.g. for print())
 - [ ] range-for

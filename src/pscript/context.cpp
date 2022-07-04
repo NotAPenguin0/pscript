@@ -238,9 +238,7 @@ comment <- '//' any '\n'
 using namespace std::literals::string_literals;
 
 context::context(std::size_t mem_size) : mem(mem_size) {
-    std::cout << "creating parser" << std::endl;
     ast_parser = std::make_unique<peg::parser>(grammar);
-    std::cout << "parser created" << std::endl;
     if (ast_parser == nullptr) throw std::runtime_error("failed to create parser");
     ast_parser->enable_ast();
     ast_parser->enable_packrat_parsing();
@@ -345,6 +343,11 @@ void context::execute(ps::script const& script, ps::execution_context exec) {
             *exec_ctx.err << "execution terminated due to unexpected exception: " << e.what() << std::endl;
         }
     }
+}
+
+void context::execute(std::shared_ptr<ps::script> const& script, ps::execution_context exec) {
+    execute(*script, exec);
+    executed_scripts.push_back(script);
 }
 
 ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {

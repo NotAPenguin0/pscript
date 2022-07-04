@@ -18,7 +18,7 @@ target_include_directories(ps-glad PUBLIC external/glad330/include external/impl
 
 add_executable(pscript-demo main.cpp external/imgui_impl_opengl3.cpp external/imgui_impl_glfw.cpp external/implot/implot.cpp external/implot/implot_items.cpp)
 
-target_link_libraries(pscript-demo PRIVATE plib imgui ps-glad glfw)
+target_link_libraries(pscript-demo PRIVATE pscript-lib imgui ps-glad glfw)
 target_include_directories(pscript-demo PRIVATE {imgui_SOURCE_DIR}/include)
 target_compile_options(pscript-demo PRIVATE -Wno-format -Wno-macro-redefined)
 
@@ -27,7 +27,7 @@ add_custom_command(
         TARGET pscript-demo POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../../modules/" ${CMAKE_CURRENT_BINARY_DIR}/pscript-modules
         DEPENDS ${MODULE_FILES}
-        COMMENT "Copying plib modules - demo"
+        COMMENT "Copying pscript modules - demo"
         VERBATIM
 )
 

@@ -19,6 +19,8 @@ endif()
 option(PSCRIPT_ENABLE_TESTS "Enable building tests" ${is_root_project})
 option(PSCRIPT_BUILD_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
 
+option(PSCRIPT_BUILD_COMMAND_LINE "Enable building the command-line interpreter" ON)
+
 set(PEGLIB_BUILD_TESTS OFF)
 
 if(${PSCRIPT_ENABLE_TESTS})
@@ -47,27 +49,42 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fmt)
 
-add_library(pscript STATIC)
-target_sources(pscript PRIVATE
+add_library(pscript-lib STATIC)
+target_sources(pscript-lib PRIVATE
         src/pscript/context.cpp
         src/pscript/memory.cpp
         src/pscript/value.cpp
         src/pscript/variable.cpp
         src/pscript/script.cpp
 )
-target_include_directories(pscript PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
+target_include_directories(pscript-lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${peglib_SOURCE_DIR})
 
-
-target_link_libraries(pscript PUBLIC fmt plib)
-target_include_directories(pscript PUBLIC ${fmt_SOURCE_DIR}/include)
-target_compile_options(pscript PRIVATE "-Wno-format")
+target_link_libraries(pscript-lib PUBLIC fmt plib)
+target_include_directories(pscript-lib PUBLIC ${fmt_SOURCE_DIR}/include)
+target_compile_options(pscript-lib PRIVATE "-Wno-format")
 
 # copy over modules to build directory
 file(GLOB_RECURSE MODULE_FILES "modules/*")
 add_custom_command(
-        TARGET pscript POST_BUILD
+        TARGET pscript-lib POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/modules/" ${${CMAKE_PROJECT_NAME}_BINARY_DIR}/pscript-modules
         DEPENDS ${MODULE_FILES}
         COMMENT "Copying pscript modules"
         VERBATIM
 )
+
+if(${PSCRIPT_BUILD_COMMAND_LINE})
+  FetchContent_Declare(argumentum
+          GIT_REPOSITORY https://github.com/mmahnic/argumentum
+          GIT_TAG v0.3.1
+  )
+  FetchContent_MakeAvailable(argumentum)
+
+  message(STATUS "Building pscript command line tool")
+  add_executable(pscript)
+  target_sources(pscript PRIVATE
+          src/interpreter/main.cpp
+  )
+  target_link_libraries(pscript PRIVATE pscript-lib argumentum)
+  target_include_directories(pscript PRIVATE ${argumentum_SOURCE_DIR}/include)
+endif(${PSCRIPT_BUILD_COMMAND_LINE})

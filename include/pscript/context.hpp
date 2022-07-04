@@ -89,10 +89,16 @@ public:
     [[nodiscard]] ps::value& get_variable_value(std::string const& name, peg::Ast const* node = nullptr, block_scope* scope = nullptr);
 
     /**
-     * @brief Executes a script in this context.
+     * @brief Executes a script in this context. Note that this function is NOT safe to use in interactive mode, and may be removed in a future version.
      * @param script Script object to execute.
      */
     void execute(ps::script const& script, ps::execution_context exec = {});
+
+    /**
+     * @brief Executes a script in this context.
+     * @param script Script object to execute.
+     */
+    void execute(std::shared_ptr<ps::script> const& script, ps::execution_context exec = {});
 
 private:
     struct function {
@@ -147,6 +153,9 @@ private:
     std::stack<function_call> call_stack {};
 
     std::unique_ptr<peg::parser> ast_parser;
+    // context must keep a list of scripts to make sure function node pointers etc remain valid throughout the entire context
+    // lifetime (see for example interactive mode).
+    std::vector<std::shared_ptr<ps::script>> executed_scripts;
 
     ps::value execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix = ""); // namespace prefix used for importing
 

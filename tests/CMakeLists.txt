@@ -10,7 +10,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(catch2)
 
 add_executable(pscript-test main.cpp)
-target_link_libraries(pscript-test PRIVATE pscript Catch2::Catch2WithMain)
+target_link_libraries(pscript-test PRIVATE pscript-lib Catch2::Catch2WithMain)
 target_compile_options(pscript-test PRIVATE -Wno-macro-redefined -Wno-format)
 
 add_test(

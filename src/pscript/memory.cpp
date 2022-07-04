@@ -9,23 +9,18 @@
 
 #include <cstring>
 
-#include <iostream>
-
 namespace ps {
 
 memory_pool::memory_pool(std::size_t size) {
     memory = std::make_unique<ps::byte[]>(size);
     mem_size = size;
-    std::cout << "before memset" << std::endl;
     // Zero out memory
     std::memset(memory.get(), 0, size);
-    std::cout << "after memset" << std::endl;
 
     // Initialize buddy allocator
     root_block = std::make_unique<block>();
     root_block->ptr = begin();
     root_block->size = mem_size;
-    std::cout << "after memory_pool constructor" << std::endl;
 }
 
 [[nodiscard]] std::size_t memory_pool::size() const noexcept {
