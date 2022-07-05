@@ -20,6 +20,7 @@ option(PSCRIPT_ENABLE_TESTS "Enable building tests" ${is_root_project})
 option(PSCRIPT_BUILD_DEMO_APP "Enable pscript demo app" ON) # TODO: set default to off
 
 option(PSCRIPT_BUILD_COMMAND_LINE "Enable building the command-line interpreter" ON)
+option(PSCRIPT_BUILD_BENCHMARKS "Enable building benchmarking tool" ON)
 
 set(PEGLIB_BUILD_TESTS OFF)
 
@@ -74,17 +75,10 @@ add_custom_command(
 )
 
 if(${PSCRIPT_BUILD_COMMAND_LINE})
-  FetchContent_Declare(argumentum
-          GIT_REPOSITORY https://github.com/mmahnic/argumentum
-          GIT_TAG v0.3.1
-  )
-  FetchContent_MakeAvailable(argumentum)
-
   message(STATUS "Building pscript command line tool")
   add_executable(pscript)
   target_sources(pscript PRIVATE
           src/interpreter/main.cpp
   )
-  target_link_libraries(pscript PRIVATE pscript-lib argumentum)
-  target_include_directories(pscript PRIVATE ${argumentum_SOURCE_DIR}/include)
+  target_link_libraries(pscript PRIVATE pscript-lib)
 endif(${PSCRIPT_BUILD_COMMAND_LINE})

@@ -3,7 +3,6 @@
 #include <fstream>
 #include <string>
 
-#include <argumentum/argparse.h>
 #include <pscript/context.hpp>
 
 namespace fs = std::filesystem;
@@ -42,33 +41,30 @@ int run_interactive(std::size_t memory) {
 }
 
 int main(int argc, char** argv) {
-    fs::path file = "";
-    std::size_t memory = 1024 * 1024;
+    constexpr std::size_t memory = 1024 * 1024;
 
-    auto parser = argumentum::argument_parser{};
-    auto params = parser.params();
-
-    parser.config().program(argv[0]).description("Command line interpreter for the pscript programming language.");
-    params.add_parameter(file, "--file", "-f")
-        .nargs(1)
-        .help("path to the pscript file to execute.")
-        .absent("")
-        .required(false);
-    params.add_parameter(memory, "--memory", "-m")
-        .required(false)
-        .absent(1024 * 1024)
-        .nargs(1)
-        .help("Memory to allocate for interpreter");
-
-    if (!parser.parse_args(argc, argv)) {
-        return 1;
+    if (argc > 3) {
+        std::cerr << "usage: pscript [filename] [memory]" << std::endl;
+        return -1;
     }
 
-    // If absent, run in interactive mode.
-    if (file == "") {
-        return run_interactive(memory);
+    if (argc == 1) {
+        run_interactive(memory);
     }
-    else {
-        return run_from_file(file, memory);
+
+    if (argc == 2) {
+        // either memory argument or filename argument
+        // if it contains a dot, it's a filename
+        std::string arg { argv[1] };
+        if (arg.find('.') != std::string::npos) {
+            run_from_file(arg, memory);
+        } else {
+            run_interactive(std::stoi(arg));
+        }
+    }
+
+    else if (argc == 3) {
+        // path + memory
+        run_from_file(argv[1], std::stoi(argv[2]));
     }
 }
