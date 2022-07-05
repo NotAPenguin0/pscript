@@ -301,7 +301,6 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
     if (auto old = variables.find(name); old != variables.end()) {
         // Variable already exists, so shadow it with a new type by assigning a new value to it.
         // We first need to free the old memory
-        old->second.value().on_destroy();
         old->second.value() = std::move(initializer);
         return old->second;
     } else {
