@@ -2,6 +2,10 @@ fn print(x: any) -> void {
     __print(x);
 }
 
+fn printf(fmt: str, args...) -> void {
+	__print(fmt.format(args...));
+}
+
 // reads a full line of input
 fn readln() -> str {
     return __readln();
