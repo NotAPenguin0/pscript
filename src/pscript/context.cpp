@@ -85,7 +85,7 @@ identifier <- ([a-zA-Z] [a-zA-Z_0-9]*)
 # a literal is currently either a string or a number.
 literal <- boolean / string / number
 number <- (float / integer) literal_suffix?
-literal_suffix <- 'u' / 'f'
+literal_suffix <- 'u'
 integer <- < [0-9]+ >
 float <- < [0-9]+.[0-9]+ >
 string <- < quote any quote >
@@ -149,7 +149,7 @@ element <- comment / statement / if / while / for
 # - an expression (usually a call expression)
 
 statement <- statement_base semicolon
-statement_base <- import / return / declaration / expression
+statement_base <- import / delete / return / declaration / expression
 
 # ================= import statements =================
 
@@ -158,6 +158,11 @@ statement_base <- import / return / declaration / expression
 import <- 'import ' (module_folder dot)* module_name { no_ast_opt }
 module_folder <- identifier
 module_name <- identifier
+
+# ================= delete statements =================
+
+# delete varname;
+delete <- 'delete ' identifier { no_ast_opt }
 
 # ================= return statements =================
 
@@ -327,6 +332,19 @@ ps::variable& context::get_variable(std::string const& name, peg::Ast const* nod
     else return &it->second;
 }
 
+void context::delete_variable(std::string const& name, block_scope* scope) {
+    auto& variables = scope ? scope->local_variables : global_variables;
+    auto it = variables.find(name);
+    if (it == variables.end()) {
+        // if we were looking in local scope, also try parent scope
+        if (scope) {
+            delete_variable(name, scope->parent);
+        }
+    }
+
+    variables.erase(it);
+}
+
 ps::value& context::get_variable_value(std::string const& name, peg::Ast const* node, block_scope* scope) {
     return get_variable(name, node, scope).value();
 }
@@ -466,6 +484,12 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
             execute(compound, &local_scope, namespace_prefix);
             execute(on_iterate, &iterator_scope, namespace_prefix);
         }
+    }
+
+    if (node_is_type(node, "delete")) {
+        peg::Ast const* identifier = find_child_with_type(node, "identifier");
+        std::string var = identifier->token_to_string();
+        delete_variable(var, scope);
     }
 
     if (has_returned()) return *call_stack.top().return_val;
@@ -789,7 +813,7 @@ std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node
     if (!list) return {};
     std::vector<ps::value> values {};
     values.reserve(list->nodes.size());
-    for (auto const& child :  list->nodes) {
+    for (auto const& child : list->nodes) {
         if (node_is_type(child.get(), "argument")) {
             values.push_back(evaluate_expression(child.get(), scope, ref));
         }
@@ -966,15 +990,20 @@ ps::value context::evaluate_string_member_function(std::string_view name, ps::va
 
 ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
     if (name == "ref") {
+        // calling evaluate_argument_list with ref = true gives us a reference
         auto arguments = evaluate_argument_list(node, scope, true);
-        return arguments[0]; // calling evaluate_argument_list with ref = true gives us a reference
-        // TODO: check arg count!
+        if (arguments.size() != 1) {
+            report_error(node, "In call to __ref(): expected exactly one argument.");
+            PLIB_UNREACHABLE();
+        }
+        return arguments[0];
     }
+
     auto arguments = evaluate_argument_list(node, scope);
     // builtin function: print
     // TODO: possibly allow variadics? (up to maximum amount)
     if (name == "print") {
-        if (arguments.empty()) {
+        if (arguments.size() != 1) {
             report_error(node, "In call to __print(): expected exactly one argument.");
             PLIB_UNREACHABLE();
         }

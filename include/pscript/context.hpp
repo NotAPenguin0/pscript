@@ -162,6 +162,7 @@ private:
     static peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) noexcept;
 
     [[nodiscard]] ps::variable* find_variable(std::string const& name, block_scope* scope);
+    void delete_variable(std::string const& name, block_scope* scope);
 
     // checks both name and original_name
     static bool node_is_type(peg::Ast const* node, std::string_view type) noexcept;

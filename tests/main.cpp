@@ -959,3 +959,19 @@ TEST_CASE("type checking") {
         ctx.execute(script, exec);
     }
 }
+
+TEST_CASE("delete statement") {
+    constexpr size_t memsize = 1024;
+    ps::context ctx(memsize);
+
+    std::string source = R"(
+        import std.io;
+        let x = 4;
+        delete x;
+        let x = 4.4;
+        std.io.print(x);
+    )";
+
+    ps::script script(source, ctx);
+    ctx.execute(script);
+}
