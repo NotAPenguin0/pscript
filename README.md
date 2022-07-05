@@ -275,4 +275,12 @@ fn print_all(x...) {
 print_all(1, 2.2, 3, "abc");
 ```
 
-As you can see, a variadic parameter can store different types.
+As you can see, a variadic parameter can store different types. Variadics can be passed around to other functions or constructors
+by expanding them.
+
+```rust
+fn printf(fmt: str, args...) {
+	// pass all elements of args... through to the builtin format() function
+	std.io.print(fmt.format(args...));
+}
+```
