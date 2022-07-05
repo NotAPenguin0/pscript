@@ -50,15 +50,10 @@ void lib_a() {
     std::cout << "lib a\n";
 }
 
-TEST_CASE("TEST") {
-    std::cout << "OUTPUT PLS\n" << std::endl;   
-}
-
 TEST_CASE("create context") {
     try {
         constexpr std::size_t memsize = 1024 * 1024;
         ps::context ctx(memsize);
-        std::cerr << "BINK BONK" << std::endl;
     } catch(std::exception const& e) {
         std::cerr << "Error during testing: " << e.what() << std::endl;  
     } 
@@ -974,4 +969,49 @@ TEST_CASE("delete statement") {
 
     ps::script script(source, ctx);
     ctx.execute(script);
+}
+
+TEST_CASE("variadics") {
+    constexpr size_t memsize = 1024;
+    ps::context ctx(memsize);
+
+    SECTION("basic syntax") {
+        std::string source = R"(
+            import std.io;
+
+            fn my_print(vals...) -> void {
+                for (let i = 0; i < vals.size(); ++i) {
+                    std.io.print(vals[i]);
+                }
+            }
+
+            my_print(1, 2, [3, 4, 5], "xyz");
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+
+    SECTION("expansion") {
+        std::string source = R"(
+            import std.io;
+
+            struct S {
+                a: int = 0;
+                b: int = 0;
+                c: int = 0;
+            };
+
+            fn printf(fmt: str, args...) -> void {
+                std.io.print(fmt.format(args...));
+                let s = S { args... };
+                std.io.print(s);
+            }
+
+            printf("Hello there, {} + {} = {}", 3, 2, 3 + 2);
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
 }

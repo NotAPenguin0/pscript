@@ -66,7 +66,7 @@ list_type::list_type(std::vector<ps::value> const& values) {
 using namespace std::literals::string_literals;
 
 void list_type::append(value const& val) {
-    if (stored_type != ps::type::null && val.get_type() != stored_type) {
+    if (stored_type != ps::type::null && stored_type != ps::type::any && val.get_type() != stored_type) {
         throw std::runtime_error("TypeError: List stores objects of type "s + type_str(stored_type).data() + ", cannot insert object of type "s + type_str(val.get_type()).data());
     }
     storage.push_back(val);

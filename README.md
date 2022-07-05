@@ -256,3 +256,23 @@ allows specifying various options to control execution.
   linking multiple extern libraries to the same context.
 - Provide additional paths to search for modules by adding paths to `module_paths`.
   Note that this also allows removing the path to the standard `pscript_modules/` folder.
+
+### 11. Advanced functionality
+
+#### a) Variadics
+
+Functions can be made to accept any number of arguments by passing in a variadic parameter.
+This parameter must always be the last parameter declared. In the function call, the
+variable will behave as if it is a `list<any>`.
+
+```rust
+fn print_all(x...) {
+  for (let i = 0; i < x.size(); ++i) {
+    std.io.print(x[i]);
+  }
+}
+
+print_all(1, 2.2, 3, "abc");
+```
+
+As you can see, a variadic parameter can store different types.

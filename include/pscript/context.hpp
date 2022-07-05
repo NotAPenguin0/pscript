@@ -110,6 +110,7 @@ private:
             std::string name {};
             ps::type type {};
             std::string type_name {}; // if type is a struct, stores the structs name.
+            bool is_variadic = false; // if a parameter is variadic, it will be created as a list<any> under the hood.
         };
         // parameters this function was declared with
         std::vector<parameter> params;

@@ -112,8 +112,9 @@ extern_var <- 'extern let ' identifier space arrow typename semicolon
 # ================= functions =================
 
 # for functions we need to be able to create parameter lists.
-parameter_list <- parameter (comma parameter)* { no_ast_opt }
+parameter_list <- variadic / (parameter (comma parameter)* (comma variadic)?) { no_ast_opt }
 parameter <- identifier colon typename
+variadic <- identifier '...' { no_ast_opt }
 
 # a function can either be an externally declared function, or a function definition.
 function <- function_ext / function_def
@@ -203,13 +204,14 @@ op_expression <- atom (operator atom)* {
     L / *
 }
 # this is to fully support recursive expressions.
-atom <- unary_operator? (access_expression / constructor_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
+atom <- unary_operator? (access_expression constructor_expression / parens_open expression parens_close / index_expression / list_expression / call_expression / parens_open operand parens_close / operand)
 operand <- < literal / identifier >
 
 # ----- call expression -----
 call_expression <- namespace_list? (identifier / builtin_function) space parens_open argument_list? parens_close
 argument_list <- argument ( comma argument )* { no_ast_opt }
-argument <- expression
+argument <- variadic_expansion / expression
+variadic_expansion <- identifier '...' { no_ast_opt }
 
 # ----- indexing expression -----
 index_expression <- identifier list_open expression list_close
@@ -402,6 +404,10 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         evaluate_extern_variable(node, namespace_prefix);
     }
 
+    if (node_is_type(node, "atom")) {
+        evaluate_expression(node, scope);
+    }
+
     if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
         for (auto const& child : node->nodes) {
             execute(child.get(), scope, namespace_prefix);
@@ -542,6 +548,18 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     }
     if (params) {
         for (auto const& child : params->nodes) {
+            if (node_is_type(child.get(), "variadic")) {
+                peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
+                func.params.push_back(function::parameter{
+                    .name = param_name->token_to_string(),
+                    .type = type::any,
+                    .type_name = "",
+                    .is_variadic = true
+                });
+                // variadic is always the last parameter, so this is easy
+                break;
+            }
+
             if (!node_is_type(child.get(), "parameter")) continue;
             peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
             peg::Ast const* param_type = find_child_with_type(child.get(), "typename");
@@ -815,7 +833,17 @@ std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node
     values.reserve(list->nodes.size());
     for (auto const& child : list->nodes) {
         if (node_is_type(child.get(), "argument")) {
-            values.push_back(evaluate_expression(child.get(), scope, ref));
+            if (node_is_type(child.get(), "variadic_expansion")) {
+                // if node is a variadic expansion, we need to loop over the elements in the list and expand them by adding them all to our argument list
+                peg::Ast const* identifier = find_child_with_type(child.get(), "identifier");
+                auto& list_val = get_variable_value(identifier->token_to_string(), child.get(), scope);
+                auto& variadic_list = static_cast<ps::list&>(list_val);
+                for (std::size_t i = 0; i < variadic_list->size(); ++i) {
+                    values.push_back(variadic_list->get(i));
+                }
+            } else {
+                values.push_back(evaluate_expression(child.get(), scope, ref));
+            }
         }
     }
     return values;
@@ -838,15 +866,41 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
 
     auto arguments = evaluate_argument_list(call_node, call_scope);
     // no work
-    if (arguments.empty()) return;
+    if (func->params.empty()) return;
 
-    if (arguments.size() != func->params.size()) {
+    // if there is only a variadic parameter we need to handle the case where no arguments are passed
+    if (func->params[0].is_variadic && arguments.empty()) {
+        ps::variable& _ = create_variable(func->params[0].name, ps::value::from(memory(), ps::list_type {}), func_scope);
+        return;
+    }
+
+    if (arguments.size() < func->params.size()) {
         report_error(call_node, fmt::format("In call to function {}: expected {} arguments, got {}", func->name, func->params.size(), arguments.size()));
         PLIB_UNREACHABLE();
     }
 
     // create variables with function arguments in call scope and execute type check for each of them
     for (std::size_t i = 0; i < arguments.size(); ++i) {
+        if (i >= func->params.size()) {
+            report_error(call_node, fmt::format("In call to function {}: expected {} arguments, got {}", func->name, func->params.size(), arguments.size()));
+            PLIB_UNREACHABLE();
+        }
+
+        if (func->params[i].is_variadic) {
+            // Special treatment for variadics: we create a list of all following arguments, and then exit
+            ps::variable& var = create_variable(func->params[i].name, ps::value::from(memory(), ps::list_type {}), func_scope);
+            ps::value& list_val = var.value();
+            auto& list = static_cast<ps::list&>(list_val);
+            for (std::size_t j = i; j < arguments.size(); ++j) {
+                if (!try_cast(arguments[j], arguments[j].get_type(), ps::type::any)) {
+                    report_error(call_node, "Unexpected error: cast to 'any' failed");
+                }
+                list->append(arguments[j]);
+            }
+
+            break;
+        }
+
         ps::type const given_type = arguments[i].get_type();
         ps::type const expected_type = func->params[i].type;
         if (!try_cast(arguments[i], given_type, expected_type)) {

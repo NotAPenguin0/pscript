@@ -19,4 +19,5 @@
 - [ ] move test suite to full programs loaded from files instead of small snippets
 - [X] benchmarking suite
 - [ ] variadic arguments? (e.g. for print())
+  - [ ] allow variadic expansion in more contexts than just builtin format() call
 - [ ] range-for
