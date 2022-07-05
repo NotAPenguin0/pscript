@@ -109,7 +109,8 @@ private:
     std::size_t mem_size = 0;
 
     static constexpr inline std::size_t min_block_size = 16;
-    static constexpr inline std::size_t small_block_cache_size = 32;
+    static constexpr inline std::size_t small_block_cache_size = 64;
+    static constexpr inline std::size_t max_consecutive_merges = 4;
 
     /**
      * @brief Represents a block in the buddy allocator.
@@ -131,6 +132,9 @@ private:
     std::unique_ptr<block> root_block = nullptr;
 
     std::array<block*, small_block_cache_size> small_block_cache {};
+    // fast lookup for blocks that are allocated.
+    // TODO: possibly use faster hashmap if this becomes a bottleneck again
+    std::unordered_map<ps::pointer, block*> allocated_block_lookup {};
     std::size_t num_small_blocks = 0;
 
     // Finds a block to allocate with given size, starting at a given root block.
@@ -139,7 +143,7 @@ private:
 
     // Descends the tree to find the block holding the pointer and frees this block.
     // Possibly also merges it with its buddy.
-    bool free_block(block* root, block* parent, ps::pointer ptr);
+    bool free_block(ps::pointer ptr);
 
     // Divides a block into two buddies.
     // If the block is already the minimum size, this does nothing and returns false, otherwise it returns true.

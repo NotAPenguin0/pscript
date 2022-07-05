@@ -52,12 +52,15 @@ memory_pool::memory_pool(std::size_t size) {
 }
 
 [[nodiscard]] pointer memory_pool::allocate(std::size_t bytes) {
+    return reinterpret_cast<pointer>(new std::byte[bytes]);
     // Compute the smallest possible block size that would fit this allocation
     std::size_t const block_size = std::max(min_block_size, plib::next_pow_two(bytes));
     // Find a block, possibly subdividing blocks
     block* block = find_block(root_block.get(), block_size);
     // If no block was found, return a null pointer
     if (!block) return null_pointer;
+    // Add the block to the allocated block cache, so it can be found easily when freeing
+    allocated_block_lookup[block->ptr] = block;
     // Mark it as allocated and return the pointer
     block->free = false;
     return block->ptr;
@@ -65,8 +68,8 @@ memory_pool::memory_pool(std::size_t size) {
 
 void memory_pool::free(ps::pointer ptr) {
     if (!verify_pointer(ptr)) return;
-
-    free_block(root_block.get(), nullptr, ptr);
+    delete[] decode_pointer(ptr);
+    free_block(ptr);
 }
 
 [[nodiscard]] bool memory_pool::verify_pointer(ps::pointer ptr) const noexcept {
@@ -109,64 +112,34 @@ void memory_pool::verify_pointer_throw(ps::pointer ptr) const {
     return find_block(root->right.get(), block_size);
 }
 
-bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
+bool memory_pool::free_block(ps::pointer ptr) {
     // We need to find the block holding the allocated pointer.
     // This is going to be the block with the free flag on false, and holding this pointer.
 
-    if (!root) return false;
-
-    // Found matching pointer. This will be the allocated block if it has no child buddies.
-    if (root->ptr == ptr && !root->left && !root->right) {
-        // Mark the block as free
-        root->free = true;
-        // Zero out block memory
-        std::memset(decode_pointer(root->ptr), 0, root->size);
-        // If this was a small block, and there is space left in the small block cache, add it to the cache.
-        if (root->size == min_block_size && num_small_blocks != small_block_cache.size()) {
-            small_block_cache[num_small_blocks++] = root;
-        }
-        // If there is a parent, check if both left and right of it are free
-        if (parent && parent->left->free && parent->right->free) {
-            // If so, merge those blocks
-            bool success = merge_blocks(parent);
-            // Something went wrong
-            if (!success) return false;
-        }
-        return true; // freed a block, return true
-
-    } else {
-        // This isn't the block holding the allocation, try to free in left and right
-
-        // Has no children, early exit.
-        if (!root->left || !root->right) return false;
-
-        // We can make a small optimization by comparing the pointer with the pointer of the right child.
-        if (ptr < root->right->ptr) {
-            // Block must be in left child
-            bool free = free_block(root->left.get(), root, ptr);
-
-            // Once again try to merge
-            if (free && parent && parent->free && parent->left->free && parent->right->free) {
-                bool success = merge_blocks(parent);
-                if (!success) return false;
-            }
-
-            return free;
-        } else {
-            // Block must be in right child
-            bool free = free_block(root->right.get(), root, ptr);
-
-            // Once again try to merge
-            if (free && parent && parent->free && parent->left->free && parent->right->free) {
-                bool success = merge_blocks(parent);
-                if (!success) return false;
-            }
-
-            return free;
-        }
-
-        PLIB_UNREACHABLE();
+    block* b = allocated_block_lookup.at(ptr);
+    // Mark the block as free
+    b->free = true;
+    // Zero out block memory
+    std::memset(decode_pointer(ptr), 0, b->size);
+    // If this was a small block, and there is space left in the small block cache, add it to the cache.
+    if (b->size == min_block_size && num_small_blocks != small_block_cache.size()) {
+        small_block_cache[num_small_blocks++] = b;
     }
+    // If there is a parent, check if both left and right of it are free.
+    // We repeat this process up the tree as long as we can
+    block* cur = b;
+    std::size_t merge_i = 0;
+    // we limit the amount of merges to make sure we keep some smaller blocks around.
+    while (merge_i++ < max_consecutive_merges && cur->parent && cur->parent->left->free && cur->parent->right->free) {
+        // If so, merge those blocks
+        block* parent = cur->parent;
+        [[maybe_unused]] bool _ = merge_blocks(parent);
+        cur = parent;
+    }
+
+    allocated_block_lookup.erase(ptr);
+
+    return true;
 }
 
 [[nodiscard]] bool memory_pool::subdivide_block(block *b) {
@@ -219,12 +192,15 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
 }
 
 [[nodiscard]] ps::byte* memory_pool::decode_pointer(ps::pointer ptr) {
+    return reinterpret_cast<std::byte*>(ptr);
     // TODO: possibly add toggle to disable this
     verify_pointer_throw(ptr);
     return &memory[ptr];
 }
 
 [[nodiscard]] ps::byte const* memory_pool::decode_pointer(ps::pointer ptr) const {
+    return reinterpret_cast<std::byte*>(ptr);
+
     verify_pointer_throw(ptr);
     return &memory[ptr];
 }
