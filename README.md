@@ -2,7 +2,7 @@
 
 [![CMake](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml/badge.svg?branch=master)](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml)
 
-![lines](https://img.shields.io/tokei/lines/github/NotApenguin0/pscript)
+![lines](https://img.shields.io/tokei/lines/github/NotApenguin0/pscript) ![release](https://img.shields.io/github/v/release/NotAPenguin0/pscript)
 
 Custom programming language built for scripting plugins in my engine.
 
