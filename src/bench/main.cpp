@@ -37,7 +37,7 @@ std::string read_file(fs::path const& path) {
 }
 
 int main() {
-    constexpr std::size_t iterations = 100;
+    constexpr std::size_t iterations = 50;
 
     std::cout << std::setprecision(4);
     std::cout << "Benchmark\t\t||\t\tAverage runtime (milliseconds)\n";

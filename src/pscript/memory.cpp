@@ -185,11 +185,13 @@ bool memory_pool::free_block(block* root, block* parent, ps::pointer ptr) {
     b->left = std::make_unique<block>();
     b->left->ptr = b->ptr;
     b->left->size = new_size;
+    b->left->parent = b;
 
     // Right block starts at same pointer but offset for left block, with all leftover bytes.
     b->right = std::make_unique<block>();
     b->right->ptr = b->ptr + new_size;
     b->right->size = b->size - new_size;
+    b->right->parent = b;
 
     return true;
 }

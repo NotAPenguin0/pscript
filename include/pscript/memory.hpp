@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <memory>
 #include <array>
+#include <unordered_map>
 
 namespace ps {
 
@@ -108,7 +109,7 @@ private:
     std::size_t mem_size = 0;
 
     static constexpr inline std::size_t min_block_size = 16;
-    static constexpr inline std::size_t small_block_cache_size = 8;
+    static constexpr inline std::size_t small_block_cache_size = 32;
 
     /**
      * @brief Represents a block in the buddy allocator.
@@ -122,6 +123,7 @@ private:
 
         std::unique_ptr<block> left = nullptr;
         std::unique_ptr<block> right = nullptr;
+        block* parent = nullptr;
     };
 
     // Root block is the initial block and represents the full memory range.

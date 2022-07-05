@@ -1047,3 +1047,12 @@ TEST_CASE("range-for") {
         ctx.execute(script);
     }
 }
+
+// PROFILING RESULTS
+/*
+ * Currently, slow parts of the interpreter are
+ * free_block()
+ * node_is_type() -> Use string interning of some sorts so we dont compare string types all the time
+ * verify_pointer_throw()
+ * find_child_with_type() -> Same as node_is_type()
+ */
