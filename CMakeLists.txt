@@ -82,3 +82,20 @@ if(${PSCRIPT_BUILD_COMMAND_LINE})
   )
   target_link_libraries(pscript PRIVATE pscript-lib)
 endif(${PSCRIPT_BUILD_COMMAND_LINE})
+
+if (${PSCRIPT_BUILD_BENCHMARKS})
+  message(STATUS "Building pscript benchmarks")
+  add_executable(pscript-bench)
+  target_sources(pscript-bench PRIVATE
+    src/bench/main.cpp
+  )
+  target_link_libraries(pscript-bench PRIVATE pscript-lib)
+  file(GLOB BENCHMARK_FILES "benchmarks/*.ps")
+  add_custom_command(
+          TARGET pscript-bench POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/ ${CMAKE_CURRENT_BINARY_DIR}/benchmarks
+          DEPENDS ${BENCHMARK_FILES}
+          COMMENT "Copying pscript benchmarks"
+          VERBATIM
+  )
+endif(${PSCRIPT_BUILD_BENCHMARKS})
