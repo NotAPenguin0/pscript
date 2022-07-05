@@ -235,7 +235,8 @@ for <- 'for' parens_open for_content parens_close compound
 # note that there are two types of for loops: for-each loops and regular 'manual' for loops.
 for_content <- for_manual / for_each
 for_manual <- declaration semicolon expression semicolon expression
-for_each <- 'let ' identifier space colon space expression
+for_each <- 'let ' identifier space colon space (range_expression / expression)
+range_expression <- expression '..' expression
 
 # ================= comment =================
 
@@ -470,25 +471,51 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
     if (node_is_type(node, "for")) {
         peg::Ast const* content = find_child_with_type(node, "for_content");
         peg::Ast const* compound = find_child_with_type(node, "compound");
-        // TODO: add range-for
-        peg::Ast const* initializer = find_child_with_type(content, "declaration");
-        peg::Ast const* condition = find_child_with_type(content, "expression");
-        peg::Ast const* on_iterate = nullptr;
-        for (auto const& child : content->nodes) {
-            if (child.get() == condition) continue;
-            if (node_is_type(child.get(), "expression") || node_is_type(child.get(), "statement"))  {
-                on_iterate = child.get();
-                break;
+        if (node_is_type(content, "for_each")) {
+            peg::Ast const* identifier = find_child_with_type(content, "identifier");
+            peg::Ast const* iterable = find_child_with_type(content, "expression");
+            peg::Ast const* range = find_child_with_type(content, "range_expression");
+            // using for (let i : N..M) syntax
+            if (range) {
+                peg::Ast const* begin = range->nodes[0].get();
+                peg::Ast const* end = range->nodes[1].get();
+                block_scope iterator_scope {};
+                iterator_scope.parent = scope;
+                ps::variable& iterator = create_variable(identifier->token_to_string(), evaluate_expression(begin, scope), &iterator_scope);
+                ps::value& it = iterator.value();
+                ps::value end_val = evaluate_expression(end, &iterator_scope);
+                while(it < end_val) {
+                    block_scope local_scope {};
+                    local_scope.parent = &iterator_scope;
+                    execute(compound, &local_scope, namespace_prefix);
+                    // increment iterator
+                    it += ps::value::from(memory(), 1);
+                }
             }
-        }
-        block_scope iterator_scope {};
-        iterator_scope.parent = scope;
-        execute(initializer, &iterator_scope, namespace_prefix);
-        while(static_cast<bool>(evaluate_expression(condition, &iterator_scope))) {
-            block_scope local_scope {};
-            local_scope.parent = &iterator_scope;
-            execute(compound, &local_scope, namespace_prefix);
-            execute(on_iterate, &iterator_scope, namespace_prefix);
+            // using for (let i : iterable) syntax
+            else if (iterable) {
+
+            }
+        } else { // regular for loop
+            peg::Ast const* initializer = find_child_with_type(content, "declaration");
+            peg::Ast const* condition = find_child_with_type(content, "expression");
+            peg::Ast const* on_iterate = nullptr;
+            for (auto const& child : content->nodes) {
+                if (child.get() == condition) continue;
+                if (node_is_type(child.get(), "expression") || node_is_type(child.get(), "statement"))  {
+                    on_iterate = child.get();
+                    break;
+                }
+            }
+            block_scope iterator_scope {};
+            iterator_scope.parent = scope;
+            execute(initializer, &iterator_scope, namespace_prefix);
+            while(static_cast<bool>(evaluate_expression(condition, &iterator_scope))) {
+                block_scope local_scope {};
+                local_scope.parent = &iterator_scope;
+                execute(compound, &local_scope, namespace_prefix);
+                execute(on_iterate, &iterator_scope, namespace_prefix);
+            }
         }
     }
 

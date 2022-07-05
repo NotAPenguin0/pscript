@@ -14,7 +14,7 @@
 - [X] documentation/tutorial on how to use
 - [ ] extend standard library and functions for list/string types
 - [X] external functions with no return type
-- [ ] command-line interpreter tool
+- [X] command-line interpreter tool
 - [ ] debugger
 - [ ] move test suite to full programs loaded from files instead of small snippets
 - [X] benchmarking suite

@@ -1015,3 +1015,21 @@ TEST_CASE("variadics") {
         ctx.execute(script);
     }
 }
+
+TEST_CASE("range-for") {
+    constexpr size_t memsize = 1024;
+    ps::context ctx(memsize);
+
+    SECTION("range expression syntax") {
+        std::string source = R"(
+            import std.io;
+
+            for (let i : 0..10) {
+                std.io.print(i);
+            }
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
+}
