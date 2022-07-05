@@ -1032,4 +1032,18 @@ TEST_CASE("range-for") {
         ps::script script(source, ctx);
         ctx.execute(script);
     }
+
+    SECTION("list iteration") {
+        std::string source = R"(
+            import std.io;
+
+            let l = [1, 2, 3, 4, 5];
+            for (let i : l) {
+                std.io.print(i);
+            }
+        )";
+
+        ps::script script(source, ctx);
+        ctx.execute(script);
+    }
 }

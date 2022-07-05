@@ -494,7 +494,20 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
             }
             // using for (let i : iterable) syntax
             else if (iterable) {
+                ps::value iterable_val = evaluate_expression(iterable, scope);
+                if (iterable_val.get_type() != ps::type::list) {
+                    report_error(iterable, fmt::format("In range-for expression: Iterated variable '{}' 'has type '{}', which is not iterable.",
+                                                       iterable->token_to_string(), type_str(iterable_val.get_type())));
+                    PLIB_UNREACHABLE();
+                }
 
+                ps::list& list = static_cast<ps::list&>(iterable_val);
+                for (std::size_t i = 0; i < list->size(); ++i) {
+                    block_scope local_scope {};
+                    local_scope.parent = scope;
+                    ps::variable& it = create_variable(identifier->token_to_string(), ps::value::ref(list->get(i)), &local_scope);
+                    execute(compound, &local_scope, namespace_prefix);
+                }
             }
         } else { // regular for loop
             peg::Ast const* initializer = find_child_with_type(content, "declaration");
