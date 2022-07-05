@@ -2,6 +2,8 @@
 
 [![CMake](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml/badge.svg?branch=master)](https://github.com/NotAPenguin0/pscript/actions/workflows/cmake.yml)
 
+[![GitHub Release](https://img.shields.io/github/release/tterb/PlayMusic.svg?style=flat)]()
+
 Custom programming language built for scripting plugins in my engine.
 
 ## Documentation
