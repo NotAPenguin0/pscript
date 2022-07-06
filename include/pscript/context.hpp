@@ -85,8 +85,8 @@ public:
 
     [[nodiscard]] ps::variable& create_variable(std::string const& name, ps::value&& initializer, block_scope* scope = nullptr);
 
-    [[nodiscard]] ps::variable& get_variable(std::string const& name, peg::Ast const* node = nullptr, block_scope* scope = nullptr);
-    [[nodiscard]] ps::value& get_variable_value(std::string const& name, peg::Ast const* node = nullptr, block_scope* scope = nullptr);
+    [[nodiscard]] ps::variable& get_variable(std::string const& name, ps::Ast const* node = nullptr, block_scope* scope = nullptr);
+    [[nodiscard]] ps::value& get_variable_value(std::string const& name, ps::Ast const* node = nullptr, block_scope* scope = nullptr);
 
     /**
      * @brief Executes a script in this context. Note that this function is NOT safe to use in interactive mode, and may be removed in a future version.
@@ -104,7 +104,7 @@ private:
     struct function {
         // refers to key in map
         std::string_view name;
-        peg::Ast const* node = nullptr;
+        ps::Ast const* node = nullptr;
 
         struct parameter {
             std::string name {};
@@ -158,53 +158,53 @@ private:
     // lifetime (see for example interactive mode).
     std::vector<std::shared_ptr<ps::script>> executed_scripts;
 
-    ps::value execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix = ""); // namespace prefix used for importing
+    ps::value execute(ps::Ast const* node, block_scope* scope, std::string const& namespace_prefix = ""); // namespace prefix used for importing
 
-    static peg::Ast const* find_child_with_type(peg::Ast const* node, std::string_view type) noexcept;
+    static ps::Ast const* find_child_with_type(ps::Ast const* node, unsigned int type) noexcept;
 
     [[nodiscard]] ps::variable* find_variable(std::string const& name, block_scope* scope);
     void delete_variable(std::string const& name, block_scope* scope);
 
     // checks both name and original_name
-    static bool node_is_type(peg::Ast const* node, std::string_view type) noexcept;
+    static bool node_is_type(ps::Ast const* node, unsigned int type) noexcept;
 
-    static ps::type evaluate_type(peg::Ast const* node);
-    static std::string evaluate_type_name(peg::Ast const* node);
+    static ps::type evaluate_type(ps::Ast const* node);
+    static std::string evaluate_type_name(ps::Ast const* node);
 
-    void evaluate_declaration(peg::Ast const* node, block_scope* scope);
-    void evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
-    void evaluate_struct_definition(peg::Ast const* node, std::string const& namespace_prefix = "");
-    void evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix = "");
+    void evaluate_declaration(ps::Ast const* node, block_scope* scope);
+    void evaluate_function_definition(ps::Ast const* node, std::string const& namespace_prefix = "");
+    void evaluate_struct_definition(ps::Ast const* node, std::string const& namespace_prefix = "");
+    void evaluate_extern_variable(ps::Ast const* node, std::string const& namespace_prefix = "");
 
-    void evaluate_import(peg::Ast const* node);
+    void evaluate_import(ps::Ast const* node);
 
-    std::vector<ps::value> evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref = false);
+    std::vector<ps::value> evaluate_argument_list(ps::Ast const* call_node, block_scope* scope, bool ref = false);
 
-    static std::string parse_namespace(peg::Ast const* node);
+    static std::string parse_namespace(ps::Ast const* node);
 
     // clears variables in scope, then creates variables for arguments.
-    void prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
+    void prepare_function_scope(ps::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope);
 
-    ps::value evaluate_function_call(peg::Ast const* node, block_scope* scope);
-    ps::value evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name);
-    ps::value evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope);
-    ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
-    ps::value evaluate_string_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_function_call(ps::Ast const* node, block_scope* scope);
+    ps::value evaluate_external_call(ps::Ast const* node, block_scope* scope, std::string const& name);
+    ps::value evaluate_builtin_function(std::string_view name, ps::Ast const* node, block_scope* scope);
+    ps::value evaluate_list_member_function(std::string_view name, ps::variable& object, ps::Ast const* node, block_scope* scope);
+    ps::value evaluate_string_member_function(std::string_view name, ps::variable& object, ps::Ast const* node, block_scope* scope);
 
     // return reference to list value, given index-expr node.
-    ps::value& index_list(peg::Ast const* node, block_scope* scope);
-    ps::value& access_member(peg::Ast const* node, block_scope* scope);
+    ps::value& index_list(ps::Ast const* node, block_scope* scope);
+    ps::value& access_member(ps::Ast const* node, block_scope* scope);
 
-    ps::value evaluate_operand(peg::Ast const* node, block_scope* scope, bool ref = false);
-    ps::value evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope);
-    ps::value evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref = false);
-    ps::value evaluate_constructor_expression(peg::Ast const* node, block_scope* scope);
-    ps::value evaluate_list(peg::Ast const* node, block_scope* scope);
+    ps::value evaluate_operand(ps::Ast const* node, block_scope* scope, bool ref = false);
+    ps::value evaluate_operator(ps::Ast const* lhs, ps::Ast const* op, ps::Ast const* rhs, block_scope* scope);
+    ps::value evaluate_expression(ps::Ast const* node, block_scope* scope, bool ref = false);
+    ps::value evaluate_constructor_expression(ps::Ast const* node, block_scope* scope);
+    ps::value evaluate_list(ps::Ast const* node, block_scope* scope);
 
     // returns true if cast was successful, false otherwise
     static bool try_cast(ps::value& val, ps::type from, ps::type to);
 
-    static void report_error(peg::Ast const* node, std::string_view message) ;
+    static void report_error(ps::Ast const* node, std::string_view message) ;
 };
 
 

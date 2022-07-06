@@ -12,6 +12,8 @@ namespace peg {
 
 namespace ps {
 
+using Ast = peg::AstBase<peg::EmptyType>;
+
 class context;
 
 class script {
@@ -24,12 +26,12 @@ public:
      */
     [[nodiscard]] std::string const& source() const;
 
-    [[nodiscard]] std::shared_ptr<peg::Ast> const& ast() const;
+    [[nodiscard]] std::shared_ptr<ps::Ast> const& ast() const;
 
 private:
     std::string original_source {};
 
-    std::shared_ptr<peg::Ast> peg_ast {};
+    std::shared_ptr<ps::Ast> peg_ast {};
 };
 
 }

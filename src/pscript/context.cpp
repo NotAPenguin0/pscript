@@ -16,6 +16,8 @@
 
 namespace ps {
 
+using namespace peg::udl;
+
 // Not too proud of this one, but moving to an external file is also not optimal
 static const char* grammar = R"(
 # --------------------------------
@@ -261,6 +263,8 @@ ps::memory_pool const& context::memory() const noexcept {
 }
 
 [[maybe_unused]] void context::dump_memory() const noexcept {
+    return; // not implemented with current memory allocator
+    PLIB_UNREACHABLE();
     if (!exec_ctx.out) return;
     auto& out = *exec_ctx.out;
     auto old_flags = out.flags();
@@ -312,7 +316,7 @@ ps::variable& context::create_variable(std::string const& name, ps::value&& init
 }
 
 
-ps::variable& context::get_variable(std::string const& name, peg::Ast const* node, block_scope* scope) {
+ps::variable& context::get_variable(std::string const& name, ps::Ast const* node, block_scope* scope) {
     ps::variable* var = find_variable(name, scope);
     if (!var) report_error(node, fmt::format("Variable '{}' not declared in current scope.", name));
     else return *var;
@@ -347,14 +351,14 @@ void context::delete_variable(std::string const& name, block_scope* scope) {
     variables.erase(it);
 }
 
-ps::value& context::get_variable_value(std::string const& name, peg::Ast const* node, block_scope* scope) {
+ps::value& context::get_variable_value(std::string const& name, ps::Ast const* node, block_scope* scope) {
     return get_variable(name, node, scope).value();
 }
 
 
 void context::execute(ps::script const& script, ps::execution_context exec) {
     try {
-        std::shared_ptr<peg::Ast> const& ast = script.ast();
+        std::shared_ptr<ps::Ast> const& ast = script.ast();
         if (!ast) throw std::runtime_error("Invalid syntax");
         exec_ctx = std::move(exec);
         execute(ast.get(), nullptr); // start execution in global scope
@@ -370,25 +374,25 @@ void context::execute(std::shared_ptr<ps::script> const& script, ps::execution_c
     executed_scripts.push_back(script);
 }
 
-ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {
-    if (node_is_type(node, "declaration")) {
+ps::value context::execute(ps::Ast const* node, block_scope* scope, std::string const& namespace_prefix) {
+    if (node_is_type(node, "declaration"_)) {
         evaluate_declaration(node, scope);
     }
 
-    if (node_is_type(node, "function")) {
+    if (node_is_type(node, "function"_)) {
         evaluate_function_definition(node, namespace_prefix);
     }
 
-    if (node_is_type(node, "struct")) {
+    if (node_is_type(node, "struct"_)) {
         evaluate_struct_definition(node, namespace_prefix);
     }
 
-    if (node_is_type(node, "call_expression")) {
+    if (node_is_type(node, "call_expression"_)) {
         return evaluate_function_call(node, scope);
     }
 
     // sometimes expressions can occur "in the wild", for example 'n = 5' or 'n += 6'
-    if (node_is_type(node, "op_expression")) {
+    if (node_is_type(node, "op_expression"_)) {
         evaluate_expression(node, scope);
     }
 
@@ -396,19 +400,19 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         return !call_stack.empty() && call_stack.top().return_val != std::nullopt;
     };
 
-    if (node_is_type(node, "import")) {
+    if (node_is_type(node, "import"_)) {
         evaluate_import(node);
     }
 
-    if (node_is_type(node, "extern_var")) {
+    if (node_is_type(node, "extern_var"_)) {
         evaluate_extern_variable(node, namespace_prefix);
     }
 
-    if (node_is_type(node, "atom")) {
+    if (node_is_type(node, "atom"_)) {
         evaluate_expression(node, scope);
     }
 
-    if (node_is_type(node, "statement") || node_is_type(node, "compound") || node_is_type(node, "script") || node_is_type(node, "content")) {
+    if (node_is_type(node, "statement"_) || node_is_type(node, "compound"_) || node_is_type(node, "script"_) || node_is_type(node, "content"_)) {
         for (auto const& child : node->nodes) {
             execute(child.get(), scope, namespace_prefix);
 
@@ -416,7 +420,7 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         }
     }
 
-    if (node_is_type(node, "return")) {
+    if (node_is_type(node, "return"_)) {
         call_stack.top().return_val = ps::value::null();
         // first child node of a return statement is the return expression.
         if (!node->nodes.empty()) {
@@ -439,27 +443,27 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         }
     }
 
-    if (node_is_type(node, "if")) {
-        peg::Ast const* condition_node = find_child_with_type(node, "expression");
+    if (node_is_type(node, "if"_)) {
+        ps::Ast const* condition_node = find_child_with_type(node, "expression"_);
         ps::value condition = evaluate_expression(condition_node, scope);
         // If the condition evaluates to true, we can execute the compound block with a new scope
         block_scope local_scope {};
         local_scope.parent = scope;
         if (static_cast<bool>(condition)) {
-            peg::Ast const* compound = find_child_with_type(node, "compound");
+            ps::Ast const* compound = find_child_with_type(node, "compound"_);
             execute(compound, &local_scope);
         } else {
             // if an else block is present, execute it
-            peg::Ast const* else_block = find_child_with_type(node, "else");
+            ps::Ast const* else_block = find_child_with_type(node, "else"_);
             if (else_block) {
-                execute(find_child_with_type(else_block, "compound"), &local_scope);
+                execute(find_child_with_type(else_block, "compound"_), &local_scope);
             }
         }
     }
 
-    if (node_is_type(node, "while")) {
-        peg::Ast const* condition_node = find_child_with_type(node, "expression");
-        peg::Ast const* compound = find_child_with_type(node, "compound");
+    if (node_is_type(node, "while"_)) {
+        ps::Ast const* condition_node = find_child_with_type(node, "expression"_);
+        ps::Ast const* compound = find_child_with_type(node, "compound"_);
         while(static_cast<bool>(evaluate_expression(condition_node, scope))) {
             block_scope local_scope {};
             local_scope.parent = scope;
@@ -467,17 +471,17 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         }
     }
 
-    if (node_is_type(node, "for")) {
-        peg::Ast const* content = find_child_with_type(node, "for_content");
-        peg::Ast const* compound = find_child_with_type(node, "compound");
-        if (node_is_type(content, "for_each")) {
-            peg::Ast const* identifier = find_child_with_type(content, "identifier");
-            peg::Ast const* iterable = find_child_with_type(content, "expression");
-            peg::Ast const* range = find_child_with_type(content, "range_expression");
+    if (node_is_type(node, "for"_)) {
+        ps::Ast const* content = find_child_with_type(node, "for_content"_);
+        ps::Ast const* compound = find_child_with_type(node, "compound"_);
+        if (node_is_type(content, "for_each"_)) {
+            ps::Ast const* identifier = find_child_with_type(content, "identifier"_);
+            ps::Ast const* iterable = find_child_with_type(content, "expression"_);
+            ps::Ast const* range = find_child_with_type(content, "range_expression"_);
             // using for (let i : N..M) syntax
             if (range) {
-                peg::Ast const* begin = range->nodes[0].get();
-                peg::Ast const* end = range->nodes[1].get();
+                ps::Ast const* begin = range->nodes[0].get();
+                ps::Ast const* end = range->nodes[1].get();
                 block_scope iterator_scope {};
                 iterator_scope.parent = scope;
                 ps::variable& iterator = create_variable(identifier->token_to_string(), evaluate_expression(begin, scope), &iterator_scope);
@@ -509,12 +513,12 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
                 }
             }
         } else { // regular for loop
-            peg::Ast const* initializer = find_child_with_type(content, "declaration");
-            peg::Ast const* condition = find_child_with_type(content, "expression");
-            peg::Ast const* on_iterate = nullptr;
+            ps::Ast const* initializer = find_child_with_type(content, "declaration"_);
+            ps::Ast const* condition = find_child_with_type(content, "expression"_);
+            ps::Ast const* on_iterate = nullptr;
             for (auto const& child : content->nodes) {
                 if (child.get() == condition) continue;
-                if (node_is_type(child.get(), "expression") || node_is_type(child.get(), "statement"))  {
+                if (node_is_type(child.get(), "expression"_) || node_is_type(child.get(), "statement"_))  {
                     on_iterate = child.get();
                     break;
                 }
@@ -531,8 +535,8 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
         }
     }
 
-    if (node_is_type(node, "delete")) {
-        peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    if (node_is_type(node, "delete"_)) {
+        ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
         std::string var = identifier->token_to_string();
         delete_variable(var, scope);
     }
@@ -541,20 +545,20 @@ ps::value context::execute(peg::Ast const* node, block_scope* scope, std::string
     else return ps::value::null();
 }
 
-peg::Ast const* context::find_child_with_type(peg::Ast const* node, std::string_view type) noexcept {
+ps::Ast const* context::find_child_with_type(ps::Ast const* node, unsigned int type) noexcept {
     for (auto const& child : node->nodes) {
-        if (child->original_name == type || child->name == type) return child.get();
+        if (node_is_type(child.get(), type)) return child.get();
     }
     return nullptr;
 }
 
-bool context::node_is_type(peg::Ast const* node, std::string_view type) noexcept {
-    return node->name == type || node->original_name == type;
+bool context::node_is_type(ps::Ast const* node, unsigned int type) noexcept {
+    return node->tag == type || node->original_tag == type;
 }
 
-void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    peg::Ast const* initializer = find_child_with_type(node, "expression");
+void context::evaluate_declaration(ps::Ast const* node, block_scope* scope) {
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
+    ps::Ast const* initializer = find_child_with_type(node, "expression"_);
 
     if (!identifier) {
         report_error(node, "Expected an identifier in declaration.");
@@ -570,15 +574,15 @@ void context::evaluate_declaration(peg::Ast const* node, block_scope* scope) {
     ps::variable& var = create_variable(identifier->token_to_string(), std::move(init_val), scope);
 }
 
-void context::evaluate_function_definition(peg::Ast const* node, std::string const& namespace_prefix) {
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    peg::Ast const* params = find_child_with_type(node, "parameter_list");
-    peg::Ast const* ret_type = find_child_with_type(node, "typename");
+void context::evaluate_function_definition(ps::Ast const* node, std::string const& namespace_prefix) {
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
+    ps::Ast const* params = find_child_with_type(node, "parameter_list"_);
+    ps::Ast const* ret_type = find_child_with_type(node, "typename"_);
 
     // If a function is external, this node will be null.
     // We will use this to test for an external function on the call site, and
     // execute the external call if so.
-    peg::Ast const* content = find_child_with_type(node, "compound");
+    ps::Ast const* content = find_child_with_type(node, "compound"_);
     function func {};
     func.node = content;
     func.return_type = evaluate_type(ret_type);
@@ -587,8 +591,8 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     }
     if (params) {
         for (auto const& child : params->nodes) {
-            if (node_is_type(child.get(), "variadic")) {
-                peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
+            if (node_is_type(child.get(), "variadic"_)) {
+                ps::Ast const* param_name = find_child_with_type(child.get(), "identifier"_);
                 func.params.push_back(function::parameter{
                     .name = param_name->token_to_string(),
                     .type = type::any,
@@ -599,9 +603,9 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
                 break;
             }
 
-            if (!node_is_type(child.get(), "parameter")) continue;
-            peg::Ast const* param_name = find_child_with_type(child.get(), "identifier");
-            peg::Ast const* param_type = find_child_with_type(child.get(), "typename");
+            if (!node_is_type(child.get(), "parameter"_)) continue;
+            ps::Ast const* param_name = find_child_with_type(child.get(), "identifier"_);
+            ps::Ast const* param_type = find_child_with_type(child.get(), "typename"_);
             ps::type const type = evaluate_type(param_type);
             std::string type_name {};
             if (type == ps::type::structure) {
@@ -616,19 +620,19 @@ void context::evaluate_function_definition(peg::Ast const* node, std::string con
     it.first->second.name = it.first->first;
 }
 
-void context::evaluate_struct_definition(peg::Ast const* node, std::string const& namespace_prefix) {
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    peg::Ast const* members = find_child_with_type(node, "struct_items");
+void context::evaluate_struct_definition(ps::Ast const* node, std::string const& namespace_prefix) {
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
+    ps::Ast const* members = find_child_with_type(node, "struct_items"_);
     struct_description info {};
 
     if (members) {
         for (auto const& field : members->nodes) {
-            if (!node_is_type(field.get(), "struct_item")) continue;
+            if (!node_is_type(field.get(), "struct_item"_)) continue;
 
-            peg::Ast const* name = find_child_with_type(field.get(), "identifier");
-            peg::Ast const* initializer = find_child_with_type(field.get(), "struct_initializer");
-            peg::Ast const* field_type = find_child_with_type(field.get(), "typename");
-            peg::Ast const* init_expression = find_child_with_type(initializer, "expression");
+            ps::Ast const* name = find_child_with_type(field.get(), "identifier"_);
+            ps::Ast const* initializer = find_child_with_type(field.get(), "struct_initializer"_);
+            ps::Ast const* field_type = find_child_with_type(field.get(), "typename"_);
+            ps::Ast const* init_expression = find_child_with_type(initializer, "expression"_);
             ps::value init_value = evaluate_expression(init_expression, nullptr);
             ps::type const type = evaluate_type(field_type);
             std::string type_name {};
@@ -665,8 +669,8 @@ void context::evaluate_struct_definition(peg::Ast const* node, std::string const
     it.first->second.name = it.first->first;
 }
 
-ps::type context::evaluate_type(peg::Ast const* node) {
-    peg::Ast const* builtin = find_child_with_type(node, "builtin_type");
+ps::type context::evaluate_type(ps::Ast const* node) {
+    ps::Ast const* builtin = find_child_with_type(node, "builtin_type"_);
     if (builtin) {
         std::string const& name = builtin->token_to_string();
         if (name == "int") return ps::type::integer;
@@ -682,20 +686,20 @@ ps::type context::evaluate_type(peg::Ast const* node) {
     return ps::type::structure;
 }
 
-std::string context::evaluate_type_name(peg::Ast const* node) {
+std::string context::evaluate_type_name(ps::Ast const* node) {
     // TODO: namespace support
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
     return identifier->token_to_string();
 }
 
-void context::evaluate_extern_variable(peg::Ast const* node, std::string const& namespace_prefix) {
+void context::evaluate_extern_variable(ps::Ast const* node, std::string const& namespace_prefix) {
     if (!exec_ctx.externs) {
         report_error(node, "Tried to load external variable, but no extern library was bound.");
         PLIB_UNREACHABLE();
     }
 
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    peg::Ast const* type = find_child_with_type(node, "typename");
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
+    ps::Ast const* type = find_child_with_type(node, "typename"_);
 
     std::string name = namespace_prefix + identifier->token_to_string();
 
@@ -719,15 +723,15 @@ static std::string read_script(std::ifstream& file) {
     return std::string { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 }
 
-void context::evaluate_import(peg::Ast const* node) {
+void context::evaluate_import(ps::Ast const* node) {
     std::vector<std::string> folders = {};
     for (auto const& child : node->nodes) {
-        if (node_is_type(child.get(), "module_folder")) {
+        if (node_is_type(child.get(), "module_folder"_)) {
             folders.push_back(child->token_to_string());
         }
     }
 
-    peg::Ast const* module_name = find_child_with_type(node, "module_name");
+    ps::Ast const* module_name = find_child_with_type(node, "module_name"_);
 
     // resolve module folders + name into a module file
     std::string path;
@@ -760,7 +764,7 @@ void context::evaluate_import(peg::Ast const* node) {
 
     // import it
     imported_scripts.push_back(import_data{ filepath, ps::script { read_script(module_file), *this } });
-    peg::Ast const* ast = imported_scripts.back().script.ast().get();
+    ps::Ast const* ast = imported_scripts.back().script.ast().get();
 
     // build namespace string
     std::string namespace_prefix;
@@ -773,8 +777,8 @@ void context::evaluate_import(peg::Ast const* node) {
     execute(ast, &local_scope, namespace_prefix);
 }
 
-ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope, bool ref) {
-    assert(node_is_type(node, "operand"));
+ps::value context::evaluate_operand(ps::Ast const* node, block_scope* scope, bool ref) {
+    assert(node_is_type(node, "operand"_));
 
     std::string str_repr = node->token_to_string();
 
@@ -813,7 +817,7 @@ ps::value context::evaluate_operand(peg::Ast const* node, block_scope* scope, bo
     } else return get_variable_value(str_repr, node, scope);
 }
 
-ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, peg::Ast const* rhs, block_scope* scope) {
+ps::value context::evaluate_operator(ps::Ast const* lhs, ps::Ast const* op, ps::Ast const* rhs, block_scope* scope) {
     ps::value left = evaluate_expression(lhs, scope);
     ps::value right = evaluate_expression(rhs, scope);
 
@@ -842,9 +846,9 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
 
     ps::value* value = nullptr;
     // special case for list index expressions
-    if (node_is_type(lhs, "index_expression")) {
+    if (node_is_type(lhs, "index_expression"_)) {
         value = &index_list(lhs, scope);
-    } else if (node_is_type(lhs, "access_expression")) {
+    } else if (node_is_type(lhs, "access_expression"_)) {
         value = &access_member(lhs, scope);
     } else {
         std::string tok = lhs->token_to_string();
@@ -865,16 +869,16 @@ ps::value context::evaluate_operator(peg::Ast const* lhs, peg::Ast const* op, pe
     PLIB_UNREACHABLE();
 }
 
-std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node, block_scope* scope, bool ref) {
-    peg::Ast const* list = find_child_with_type(call_node, "argument_list");
+std::vector<ps::value> context::evaluate_argument_list(ps::Ast const* call_node, block_scope* scope, bool ref) {
+    ps::Ast const* list = find_child_with_type(call_node, "argument_list"_);
     if (!list) return {};
     std::vector<ps::value> values {};
     values.reserve(list->nodes.size());
     for (auto const& child : list->nodes) {
-        if (node_is_type(child.get(), "argument")) {
-            if (node_is_type(child.get(), "variadic_expansion")) {
+        if (node_is_type(child.get(), "argument"_)) {
+            if (node_is_type(child.get(), "variadic_expansion"_)) {
                 // if node is a variadic expansion, we need to loop over the elements in the list and expand them by adding them all to our argument list
-                peg::Ast const* identifier = find_child_with_type(child.get(), "identifier");
+                ps::Ast const* identifier = find_child_with_type(child.get(), "identifier"_);
                 auto& list_val = get_variable_value(identifier->token_to_string(), child.get(), scope);
                 auto& variadic_list = static_cast<ps::list&>(list_val);
                 for (std::size_t i = 0; i < variadic_list->size(); ++i) {
@@ -888,10 +892,10 @@ std::vector<ps::value> context::evaluate_argument_list(peg::Ast const* call_node
     return values;
 }
 
-std::string context::parse_namespace(peg::Ast const* node) {
+std::string context::parse_namespace(ps::Ast const* node) {
     std::string result;
     for (auto const& child : node->nodes) {
-        if (node_is_type(child.get(), "namespace")) {
+        if (node_is_type(child.get(), "namespace"_)) {
             result += ('.' + child->token_to_string());
         }
     }
@@ -900,7 +904,7 @@ std::string context::parse_namespace(peg::Ast const* node) {
     return result;
 }
 
-void context::prepare_function_scope(peg::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope) {
+void context::prepare_function_scope(ps::Ast const* call_node, block_scope* call_scope, function* func, block_scope* func_scope) {
     func_scope->parent = nullptr; // parent is global scope for function calls (as you can't access variables from previous scope, unlike in if statements).
 
     auto arguments = evaluate_argument_list(call_node, call_scope);
@@ -960,12 +964,12 @@ void context::prepare_function_scope(peg::Ast const* call_node, block_scope* cal
     }
 }
 
-ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* scope) {
-    peg::Ast const* builtin_identifier = find_child_with_type(node, "builtin_function");
+ps::value context::evaluate_function_call(ps::Ast const* node, block_scope* scope) {
+    ps::Ast const* builtin_identifier = find_child_with_type(node, "builtin_function"_);
     if (builtin_identifier) return evaluate_builtin_function(builtin_identifier->token_to_string(), node, scope);
 
-    peg::Ast const* namespace_identifier = find_child_with_type(node, "namespace_list");
-    peg::Ast const* func_identifier_node = find_child_with_type(node, "identifier");
+    ps::Ast const* namespace_identifier = find_child_with_type(node, "namespace_list"_);
+    ps::Ast const* func_identifier_node = find_child_with_type(node, "identifier"_);
 
     // namespaced functions are simply stored by concatenating their names together to make the full name, but we won't implement that yet
     std::string func_name = func_identifier_node->token_to_string();
@@ -1012,7 +1016,7 @@ ps::value context::evaluate_function_call(peg::Ast const* node, block_scope* sco
     return val;
 }
 
-ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* scope, std::string const& name) {
+ps::value context::evaluate_external_call(ps::Ast const* node, block_scope* scope, std::string const& name) {
     if (!exec_ctx.externs) {
         report_error(node, fmt::format("No function library bound, cannot evaluate external call to '{}'.", name));
         PLIB_UNREACHABLE();
@@ -1041,7 +1045,7 @@ ps::value context::evaluate_external_call(peg::Ast const* node, block_scope* sco
     PLIB_UNREACHABLE();
 }
 
-ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_list_member_function(std::string_view name, ps::variable& object, ps::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
 
     ps::value& val = object.value();
@@ -1061,7 +1065,7 @@ ps::value context::evaluate_list_member_function(std::string_view name, ps::vari
     return ps::value::null();
 }
 
-ps::value context::evaluate_string_member_function(std::string_view name, ps::variable& object, peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_string_member_function(std::string_view name, ps::variable& object, ps::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
 
     ps::value& val = object.value();
@@ -1081,7 +1085,7 @@ ps::value context::evaluate_string_member_function(std::string_view name, ps::va
     return ps::value::null();
 }
 
-ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_builtin_function(std::string_view name, ps::Ast const* node, block_scope* scope) {
     if (name == "ref") {
         // calling evaluate_argument_list with ref = true gives us a reference
         auto arguments = evaluate_argument_list(node, scope, true);
@@ -1120,16 +1124,16 @@ ps::value context::evaluate_builtin_function(std::string_view name, peg::Ast con
     return ps::value::null();
 }
 
-ps::value context::evaluate_list(peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_list(ps::Ast const* node, block_scope* scope) {
    auto arguments = evaluate_argument_list(node, scope);
    return ps::value::from(memory(), ps::list_type{ arguments });
 }
 
-ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_scope* scope) {
+ps::value context::evaluate_constructor_expression(ps::Ast const* node, block_scope* scope) {
     auto arguments = evaluate_argument_list(node, scope);
     // TODO: add support for builtin types here!
-    peg::Ast const* type = find_child_with_type(node, "typename");
-    peg::Ast const* builtin_type = find_child_with_type(type, "builtin_type");
+    ps::Ast const* type = find_child_with_type(node, "typename"_);
+    ps::Ast const* builtin_type = find_child_with_type(type, "builtin_type"_);
     if (builtin_type) {
         std::string const name = builtin_type->token_to_string();
         if (name == "int") {
@@ -1142,16 +1146,16 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
         PLIB_UNREACHABLE();
     }
     std::string namespace_name {};
-    peg::Ast const* namespace_list = find_child_with_type(type, "namespace_list");
+    ps::Ast const* namespace_list = find_child_with_type(type, "namespace_list"_);
     if (namespace_list) {
         for (auto const& child : namespace_list->nodes) {
-            if (node_is_type(child.get(), "namespace")) {
+            if (node_is_type(child.get(), "namespace"_)) {
                 namespace_name += child->token_to_string() + '.';
             }
         }
     }
 
-    peg::Ast const* name = find_child_with_type(type, "identifier");
+    ps::Ast const* name = find_child_with_type(type, "identifier"_);
     std::string struct_name = namespace_name + name->token_to_string();
     auto it = structs.find(struct_name);
     if (it == structs.end()) {
@@ -1187,9 +1191,9 @@ ps::value context::evaluate_constructor_expression(peg::Ast const* node, block_s
     return ps::value::from(memory(), ps::struct_type { struct_name, initializers });
 }
 
-ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
-    peg::Ast const* identifier = find_child_with_type(node, "identifier");
-    peg::Ast const* index_expr = find_child_with_type(node, "expression");
+ps::value& context::index_list(ps::Ast const* node, block_scope* scope) {
+    ps::Ast const* identifier = find_child_with_type(node, "identifier"_);
+    ps::Ast const* index_expr = find_child_with_type(node, "expression"_);
 
     ps::value index_expr_val = evaluate_expression(index_expr, scope);
     auto& index = static_cast<ps::integer&>(index_expr_val);
@@ -1200,28 +1204,28 @@ ps::value& context::index_list(peg::Ast const* node, block_scope* scope) {
     return value;
 }
 
-ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
-    peg::Ast const* first = node->nodes[0].get();
+ps::value& context::access_member(ps::Ast const* node, block_scope* scope) {
+    ps::Ast const* first = node->nodes[0].get();
     ps::value* cur_val = nullptr;
-    if (node_is_type(first, "identifier")) {
+    if (node_is_type(first, "identifier"_)) {
         ps::variable& var = get_variable(first->token_to_string(), first, scope);
         cur_val = &var.value();
-    } else if (node_is_type(first, "index_expression")) {
+    } else if (node_is_type(first, "index_expression"_)) {
         cur_val = &index_list(first, scope);
     }
 
     for (auto const& child : node->nodes) {
         if (child.get() == first) continue; // skip initial node
-        if (node_is_type(child.get(), "identifier")) {
+        if (node_is_type(child.get(), "identifier"_)) {
             auto& as_struct = static_cast<ps::structure&>(*cur_val);
             cur_val = &as_struct->access(child->token_to_string());
-        } else if (node_is_type(child.get(), "index_expression")) {
-            peg::Ast const* identifier = find_child_with_type(child.get(), "identifier");
+        } else if (node_is_type(child.get(), "index_expression"_)) {
+            ps::Ast const* identifier = find_child_with_type(child.get(), "identifier"_);
             auto& as_struct = static_cast<ps::structure&>(*cur_val);
             auto& list = as_struct->access(identifier->token_to_string());
             auto& as_list = static_cast<ps::list&>(list);
 
-            peg::Ast const* index_expr = find_child_with_type(child.get(), "expression");
+            ps::Ast const* index_expr = find_child_with_type(child.get(), "expression"_);
             ps::value index_val = evaluate_expression(index_expr, scope);
             auto& index = static_cast<ps::integer&>(index_val);
             cur_val = &as_list->get(index.value());
@@ -1230,55 +1234,55 @@ ps::value& context::access_member(peg::Ast const* node, block_scope* scope) {
     return *cur_val;
 }
 
-ps::value context::evaluate_expression(peg::Ast const* node, block_scope* scope, bool ref) {
+ps::value context::evaluate_expression(ps::Ast const* node, block_scope* scope, bool ref) {
     // base case, an operand is a simple value.
-    if (node_is_type(node, "operand")) {
+    if (node_is_type(node, "operand"_)) {
         return evaluate_operand(node, scope, ref);
     }
 
-    if (node_is_type(node, "index_expression")) {
+    if (node_is_type(node, "index_expression"_)) {
         return index_list(node, scope);
     }
 
-    if (node_is_type(node, "constructor_expression")) {
+    if (node_is_type(node, "constructor_expression"_)) {
         return evaluate_constructor_expression(node, scope);
     }
 
-    if (node_is_type(node, "list_expression")) {
+    if (node_is_type(node, "list_expression"_)) {
         return evaluate_list(node, scope);
     }
 
-    if (node_is_type(node, "access_expression")) {
+    if (node_is_type(node, "access_expression"_)) {
         return access_member(node, scope);
     }
 
-    if (node_is_type(node, "call_expression")) {
+    if (node_is_type(node, "call_expression"_)) {
         return evaluate_function_call(node, scope);
     }
 
-    if (node_is_type(node, "op_expression")) {
-        peg::Ast const* lhs_node = node->nodes[0].get();
-        peg::Ast const* operator_node = node->nodes[1].get();
-        peg::Ast const* rhs_node = node->nodes[2].get();
+    if (node_is_type(node, "op_expression"_)) {
+        ps::Ast const* lhs_node = node->nodes[0].get();
+        ps::Ast const* operator_node = node->nodes[1].get();
+        ps::Ast const* rhs_node = node->nodes[2].get();
 
         return evaluate_operator(lhs_node, operator_node, rhs_node, scope);
     }
 
     // the atom[operand] case was already handled above.
-    if (node_is_type(node, "atom")) {
+    if (node_is_type(node, "atom"_)) {
         // skip over children until we find a child node with a type that we need.
         // this is because there are parens_open and parens_close nodes in here
         for (auto const& child : node->nodes) {
-            if (node_is_type(child.get(), "expression")) {
+            if (node_is_type(child.get(), "expression"_)) {
                 return evaluate_expression(child.get(), scope);
             }
 
-            if (node_is_type(child.get(), "unary_operator")) {
-                peg::Ast const* operand = find_child_with_type(node, "operand");
-                if (!operand) operand = find_child_with_type(node, "access_expression");
-                if (!operand) operand = find_child_with_type(node, "call_expression");
-                if (!operand) operand = find_child_with_type(node, "index_expression");
-                if (!operand) operand = find_child_with_type(node, "constructor_expression");
+            if (node_is_type(child.get(), "unary_operator"_)) {
+                ps::Ast const* operand = find_child_with_type(node, "operand"_);
+                if (!operand) operand = find_child_with_type(node, "access_expression"_);
+                if (!operand) operand = find_child_with_type(node, "call_expression"_);
+                if (!operand) operand = find_child_with_type(node, "index_expression"_);
+                if (!operand) operand = find_child_with_type(node, "constructor_expression"_);
                 std::string op = child->token_to_string();
                 if (op == "-") {
                     return -evaluate_expression(operand, scope);
@@ -1309,7 +1313,7 @@ bool context::try_cast(ps::value& val, ps::type from, ps::type to) {
     return true;
 }
 
-void context::report_error(peg::Ast const* node, std::string_view message) {
+void context::report_error(ps::Ast const* node, std::string_view message) {
     std::string error_string = "Error ";
     if (node) { // if a node was provided we can add additional source location info
         error_string += "at [" + std::to_string(node->line) + ":" + std::to_string(node->column) + "]: ";

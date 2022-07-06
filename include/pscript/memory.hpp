@@ -11,7 +11,7 @@ namespace ps {
  * @brief Pointer to byte in memory.
  */
 using pointer = std::size_t;
-constexpr pointer null_pointer = static_cast<pointer>(-1);
+constexpr pointer null_pointer = 0;
 
 using byte = std::byte;
 

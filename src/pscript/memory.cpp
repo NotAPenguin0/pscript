@@ -12,6 +12,9 @@
 namespace ps {
 
 memory_pool::memory_pool(std::size_t size) {
+    return;
+    PLIB_UNREACHABLE();
+
     memory = std::make_unique<ps::byte[]>(size);
     mem_size = size;
     // Zero out memory
@@ -53,6 +56,8 @@ memory_pool::memory_pool(std::size_t size) {
 
 [[nodiscard]] pointer memory_pool::allocate(std::size_t bytes) {
     return reinterpret_cast<pointer>(new std::byte[bytes]);
+    PLIB_UNREACHABLE();
+
     // Compute the smallest possible block size that would fit this allocation
     std::size_t const block_size = std::max(min_block_size, plib::next_pow_two(bytes));
     // Find a block, possibly subdividing blocks
@@ -69,10 +74,16 @@ memory_pool::memory_pool(std::size_t size) {
 void memory_pool::free(ps::pointer ptr) {
     if (!verify_pointer(ptr)) return;
     delete[] decode_pointer(ptr);
+    return;
+    PLIB_UNREACHABLE();
+
     free_block(ptr);
 }
 
 [[nodiscard]] bool memory_pool::verify_pointer(ps::pointer ptr) const noexcept {
+    return ptr != null_pointer;
+    PLIB_UNREACHABLE();
+
     if (ptr != null_pointer && ptr < mem_size) return true;
     return false;
 }
@@ -193,13 +204,15 @@ bool memory_pool::free_block(ps::pointer ptr) {
 
 [[nodiscard]] ps::byte* memory_pool::decode_pointer(ps::pointer ptr) {
     return reinterpret_cast<std::byte*>(ptr);
-    // TODO: possibly add toggle to disable this
+    PLIB_UNREACHABLE();
+
     verify_pointer_throw(ptr);
     return &memory[ptr];
 }
 
 [[nodiscard]] ps::byte const* memory_pool::decode_pointer(ps::pointer ptr) const {
     return reinterpret_cast<std::byte*>(ptr);
+    PLIB_UNREACHABLE();
 
     verify_pointer_throw(ptr);
     return &memory[ptr];
